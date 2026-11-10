@@ -20,6 +20,7 @@ import {
 // Synthetic emulator-only identities; never import or export production users.
 const FIRST = 'test-person-one';
 const SECOND = 'test-person-two';
+const THIRD = 'test-person-three';
 const OUTSIDER = 'test-person-outsider';
 let environment;
 
@@ -100,6 +101,75 @@ describe('Server-side authorization', () => {
     }
   });
 
+  it('allows three approved identities to check access and manage only their own data', async () => {
+    await adminSet('access/allowedUsers', { uids: [FIRST, SECOND, THIRD] });
+    for (const uid of [FIRST, SECOND, THIRD]) {
+      const db = database(uid);
+      await assertSucceeds(getDoc(doc(db, 'users', uid, 'access', 'check')));
+      const records = [
+        ['workouts', 'entry', workout(), { weight: 45, updatedAt: serverTimestamp() }],
+        ['plans', 'plan', plan(), { name: 'Updated plan', updatedAt: serverTimestamp() }],
+        ['workoutSets', 'entry_0', { workoutId: 'entry', index: 0, weight: 40, reps: 8, completed: false }, { weight: 45, completed: true }],
+      ];
+      for (const [name, id, data, changes] of records) {
+        const ref = doc(db, 'users', uid, name, id);
+        await assertSucceeds(setDoc(ref, data));
+        assert.equal((await assertSucceeds(getDoc(ref))).exists(), true);
+        assert.equal((await assertSucceeds(getDocs(collection(db, 'users', uid, name)))).size, 1);
+        await assertSucceeds(updateDoc(ref, changes));
+        await assertSucceeds(deleteDoc(ref));
+      }
+    }
+  });
+
+  it('denies cross-user reads and writes between every pair of three approved identities', async () => {
+    const approved = [FIRST, SECOND, THIRD];
+    await adminSet('access/allowedUsers', { uids: approved });
+    const records = [
+      ['workouts', 'entry', workout(), { weight: 45, updatedAt: serverTimestamp() }],
+      ['plans', 'plan', plan(), { name: 'Changed plan', updatedAt: serverTimestamp() }],
+      ['workoutSets', 'entry_0', { workoutId: 'entry', index: 0, weight: 40, reps: 8, completed: false }, { completed: true }],
+    ];
+    for (const owner of approved) {
+      for (const [name, id, data] of records) {
+        await assertSucceeds(setDoc(doc(database(owner), 'users', owner, name, id), data));
+      }
+    }
+    for (const actor of approved) {
+      for (const owner of approved.filter((uid) => uid !== actor)) {
+        const db = database(actor);
+        await assertFails(getDoc(doc(db, 'users', owner, 'access', 'check')));
+        for (const [name, id, data, changes] of records) {
+          const ref = doc(db, 'users', owner, name, id);
+          await assertFails(getDoc(ref));
+          await assertFails(getDocs(collection(db, 'users', owner, name)));
+          const otherId = name === 'workoutSets' ? 'other_0' : 'other';
+          const otherData = name === 'workoutSets' ? { ...data, workoutId: 'other' } : data;
+          await assertFails(setDoc(doc(db, 'users', owner, name, otherId), otherData));
+          await assertFails(updateDoc(ref, changes));
+          await assertFails(deleteDoc(ref));
+        }
+      }
+    }
+  });
+
+  it('denies an unlisted fourth identity when three identities are approved', async () => {
+    await adminSet('access/allowedUsers', { uids: [FIRST, SECOND, THIRD] });
+    const db = database(OUTSIDER);
+    await assertFails(getDoc(doc(db, 'users', OUTSIDER, 'access', 'check')));
+    for (const [name, id, data] of [
+      ['workouts', 'entry', workout()],
+      ['plans', 'plan', plan()],
+      ['workoutSets', 'entry_0', { workoutId: 'entry', index: 0, weight: 40, reps: 8, completed: false }],
+    ]) {
+      const ref = doc(db, 'users', OUTSIDER, name, id);
+      await assertFails(getDoc(ref));
+      await assertFails(getDocs(collection(db, 'users', OUTSIDER, name)));
+      await assertFails(setDoc(ref, data));
+      await assertFails(deleteDoc(ref));
+    }
+  });
+
   it('denies anonymous access checks and all private data operations', async () => {
     const db = database();
     await assertFails(getDoc(doc(db, 'users', FIRST, 'access', 'check')));
@@ -167,8 +237,12 @@ describe('Server-side authorization', () => {
     await assertFails(setDoc(workoutRef(), workout()));
   });
 
-  it('fails closed for malformed or non-two-person allowlists', async () => {
-    for (const uids of [[FIRST], [FIRST, SECOND, OUTSIDER], [FIRST, FIRST], [FIRST, ''], [FIRST, 2], FIRST]) {
+  it('fails closed unless allowlists contain two or three distinct nonempty strings', async () => {
+    for (const uids of [
+      [FIRST], [FIRST, SECOND, THIRD, OUTSIDER], [FIRST, FIRST], [FIRST, ''], [FIRST, 2], FIRST,
+      [FIRST, SECOND, FIRST], [FIRST, SECOND, SECOND], [FIRST, FIRST, THIRD],
+      [FIRST, SECOND, ''], [FIRST, SECOND, 3], [FIRST, SECOND, {}],
+    ]) {
       await adminSet('access/allowedUsers', { uids });
       await assertFails(getDoc(doc(database(FIRST), 'users', FIRST, 'access', 'check')));
       await assertFails(setDoc(workoutRef(), workout()));

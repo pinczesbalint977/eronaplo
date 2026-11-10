@@ -1,6 +1,6 @@
 # ERŐNAPLÓ
 
-Magyar nyelvű, mobilra tervezett edzésnapló két embernek. React JS + Vite alkalmazás, GitHub Pages tárhellyel, Firebase Authentication belépéssel és felhasználónként elkülönített Cloud Firestore adatokkal. Androidra és iPhone-ra a böngészőből telepíthető PWA.
+Magyar nyelvű, mobilra tervezett edzésnapló legfeljebb három embernek. React JS + Vite alkalmazás, GitHub Pages tárhellyel, Firebase Authentication belépéssel és felhasználónként elkülönített Cloud Firestore adatokkal. Androidra és iPhone-ra a böngészőből telepíthető PWA.
 
 A GitHub Pages beállításának és a telefonos telepítésnek a lépései a [TELEPITES_TELEFONRA.txt](TELEPITES_TELEFONRA.txt) fájlban vannak. A stílushoz illő lime súlyzóikon Androidra, maskable változatban és iPhone-ra is elkészül; minden build újragenerálja.
 
@@ -14,14 +14,22 @@ Egy mentés a teljes edzést rögzíti a kiválasztott naptári napra; egy napra
 
 A meglévő jogosultságvédett Firestore-séma használatban marad: a terv gyakorlatlistája a plans.exercises szövegmezőben, az edzéscsoport metaadatai a workouts.notes mezőben tárolódnak strukturált formában. A sorozatok a saját users/{uid}/workoutSets útvonalon maradnak. Az összes gyakorlat és sorozat egy atomi mentésben frissül, külön fejlécdokumentum nélkül. A tervalapú változathoz nem kell újra publikálni a már működő, sorozatonkénti Firestore-szabályokat. A telepítési lépések lent, a használat részletesen a HASZNALATI_UTMUTATO.txt fájlban található.
 
+## Új, harmadik felhasználó felvétele
+
+1. Firebase Console → Firestore Database → Rules: a repository aktuális `firestore.rules` fájljának teljes tartalmát másold be, majd **Publish**. A frissített szabály két vagy három különböző UID-t fogad el; így a meglévő két fiók a beállítás közben is működik.
+2. Authentication → Users: az új email/jelszavas fiókot kézzel hozd létre, és másold ki az UID-jét.
+3. Firestore → Data → `access/allowedUsers` → `uids` tömb: a meglévő kettő mellé harmadik **string** elemként add hozzá az új UID-t. A korábbi kettőt ne cseréld le. Négy UID vagy ismétlődő/üres érték minden hozzáférést tilt.
+
+Valódi UID-t kizárólag ebben a privát Firestore-dokumentumban tárolj; a repositoryba és az Actions-változókba ne kerüljön. A GitHub Actions nem publikálja a Firebase-szabályokat.
+
 ## 1. Firebase beállítása
 
 1. Nyisd meg a [Firebase Console-t](https://console.firebase.google.com/), és hozz létre egy projektet az ingyenes **Spark** csomagban. Google Analytics nem szükséges. Ne kapcsolj hozzá számlázási fiókot.
 2. A projektbeállításokban adj hozzá **Web** alkalmazást. Firebase Hosting beállítását ne válaszd: a weboldal GitHub Pages-en fut.
 3. Jegyezd fel a webalkalmazás Firebase-konfigurációját: `apiKey`, `authDomain`, `projectId`, `appId`, valamint az opcionális `storageBucket` és `messagingSenderId` mezőket.
 4. **Authentication → Sign-in method → Email/Password:** engedélyezd az email/jelszó belépést. Az email-linkes és más belépési módok nem szükségesek.
-5. **Authentication → Users → Add user:** manuálisan hozd létre a két fiókot külön email-címmel és külön, erős jelszóval. A jelszavakat közvetlenül, privát csatornán adjátok át egymásnak. Ne küldd el őket GitHub issue-ban vagy commitban.
-6. Másold ki a két felhasználó **UID** értékét. Ezeket csak az alábbi privát Firestore-dokumentumba kell beírni.
+5. **Authentication → Users → Add user:** manuálisan hozd létre az engedélyezett fiókokat külön email-címmel és külön, erős jelszóval. A jelszavakat közvetlenül, privát csatornán adjátok át egymásnak. Ne küldd el őket GitHub issue-ban vagy commitban.
+6. Másold ki a két vagy három engedélyezett felhasználó **UID** értékét. Ezeket csak az alábbi privát Firestore-dokumentumba kell beírni.
 7. **Firestore Database → Create database:** hozd létre az alapértelmezett `(default)` adatbázist, európai régióban, **production mode** beállítással. Ne használj mindenki számára olvasható „test mode” szabályokat.
 
 ### Szerveroldali engedélylista
@@ -37,7 +45,7 @@ Type: array
   1: a második felhasználó tényleges UID-je (string)
 ```
 
-Pontosan két, egymástól különböző UID szerepeljen a tömbben. A konzol adminisztrátori hozzáféréssel írja ezt a dokumentumot; a webalkalmazásnak nincs olvasási vagy írási joga hozzá. Nincs szükség az UID-k GitHub-változókba vagy frontendkódba másolására. Hiányzó vagy hibás engedélylista esetén a hozzáférés tiltott marad.
+Két vagy három, egymástól különböző, nem üres UID szerepeljen a tömbben. A konzol adminisztrátori hozzáféréssel írja ezt a dokumentumot; a webalkalmazásnak nincs olvasási vagy írási joga hozzá. Nincs szükség az UID-k GitHub-változókba vagy frontendkódba másolására. Hiányzó vagy hibás engedélylista esetén a hozzáférés tiltott marad.
 
 A jogosultságot a `firestore.rules` ellenőrzi: csak az engedélyezett felhasználó olvashatja és írhatja a saját `users/{sajátUid}/workouts/*`, `users/{sajátUid}/workoutSets/*` és `users/{sajátUid}/plans/*` dokumentumait. A másik felhasználó adatai és minden további adatútvonal tiltott. A saját `users/{sajátUid}/access/check` útvonal szerveroldali jogosultságpróba; ide nem kell dokumentumot létrehozni. A kliens ezt frissen, a szerverről ellenőrzi, mielőtt megnyitná a védett felületet.
 
@@ -131,7 +139,7 @@ Helyi, éles Firebase-szel végzett próbához szükség esetén külön add hoz
 
 A GitHub Pages nyilvánosan szolgálja ki a HTML-, CSS-, JavaScript-, ikon- és manifestfájlokat. A Firebase webkonfiguráció a buildelt JavaScriptből kiolvasható akkor is, ha Actions-változóként adod meg. Ezek projektazonosítók; nem felhasználói jelszavak és nem adminisztrátori jogosultságok. Az adatvédelmet a Firebase Authentication és a Security Rules biztosítja. [Firebase API-kulcsok](https://firebase.google.com/docs/projects/api-keys)
 
-**Soha ne kerüljön a repositoryba vagy `VITE_*` változóba felhasználói jelszó, szolgáltatásfiók privát kulcsa, admin SDK-hitelesítő vagy személyes adatexport.** A két valódi UID a privát Firestore-engedélylistán marad. Az alkalmazás nem tárol jelszót Firestore-ban vagy saját localStorage-mezőben; a Firebase SDK a bejelentkezés fenntartásához hitelesítési munkamenetadatokat tárolhat a böngészőben.
+**Soha ne kerüljön a repositoryba vagy `VITE_*` változóba felhasználói jelszó, szolgáltatásfiók privát kulcsa, admin SDK-hitelesítő vagy személyes adatexport.** A valódi UID-k a privát Firestore-engedélylistán maradnak. Az alkalmazás nem tárol jelszót Firestore-ban vagy saját localStorage-mezőben; a Firebase SDK a bejelentkezés fenntartásához hitelesítési munkamenetadatokat tárolhat a böngészőben.
 
 ## 4. Telepítés telefonra
 
@@ -197,7 +205,7 @@ Ez csak a helyi tesztemulátor letöltött programfájljainak helyét módosítj
 Az éles Firebase-konfiguráció és a valódi telefonok beállítása után ellenőrizd:
 
 1. Kijelentkezve a közvetlen `#/naplo` és más védett útvonal is csak a belépést mutassa.
-2. Mindkét fiók külön beléphessen, és frissítés után a saját adatait lássa.
+2. Mindegyik engedélyezett fiók külön beléphessen, és frissítés után a saját adatait lássa.
 3. Az első felhasználó által mentett edzés ne jelenjen meg a másodiknál; szabálytesztben a másik UID útvonalának közvetlen olvasása és írása is legyen tiltott.
 4. Kijelentkezés, majd visszalépés és fiókváltás után ne jelenjen meg az előző napló.
 5. Nem engedélyezett fiókkal a védett felület és a Firestore-adatok maradjanak elérhetetlenek.
@@ -207,7 +215,7 @@ Az éles Firebase-konfiguráció és a valódi telefonok beállítása után ell
 ### Elkészült helyi ellenőrzések – 2026. november 8.
 
 - Sikeres éles build, manifest-, ikonméret- és service-worker-ellenőrzés.
-- **25/25 Firestore Security Rules teszt**: saját adatok kezelése, fiókok elkülönítése, illetéktelen hozzáférés és engedélylista-módosítás tiltása, visszavonás, szigorú adatséma, 20 sorozat és egy teljes 10 gyakorlat × 20 sorozatos edzés atomi mentése (210 írás).
+- **28/28 Firestore Security Rules teszt**: saját adatok kezelése, fiókok elkülönítése, illetéktelen hozzáférés és engedélylista-módosítás tiltása, visszavonás, szigorú adatséma, 20 sorozat és egy teljes 10 gyakorlat × 20 sorozatos edzés atomi mentése (210 írás).
 - **6/6 base-path teszt**, továbbá tényleges `/gym-app/#/naplo` böngészős próba Chromium és WebKit alatt, offline újratöltéssel.
 - **16/16 böngészőteszt Chromium és WebKit alatt**: tervkészítés és módosítás, teljes edzés atomi mentése, előző eredmények előtöltése, naptár, korábbi naplók változatlansága, fiókváltás és hozzáférésvédelem, hálózati hibák, a 100 bejegyzéses olvasási korlát és célzott régi előzménykeresés.
 - **7/7 sorozatkezelési egységteszt**: régi adatok kezelése, dátum szerinti előzménykeresés, félkész edzések kihagyása, másolatok változatlansága, azonos napi külön edzések elkülönítése és összehasonlítás.

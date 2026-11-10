@@ -2,8 +2,8 @@ ERŐNAPLÓ – HASZNÁLATI ÚTMUTATÓ
 
 1. BELÉPÉS
 
-A két előre engedélyezett fiók saját email-címmel és jelszóval léphet be.
-Mindketten csak a saját terveiket és naplójukat látják. Belépéshez és
+Az előre engedélyezett, legfeljebb három fiók saját email-címmel és jelszóval léphet be.
+Mindannyian csak a saját terveiket és naplójukat látják. Belépéshez és
 mentéshez internet szükséges. Közös eszközön használat után jelentkezz ki.
 
 2. EDZÉSTERV KÉSZÍTÉSE
@@ -114,7 +114,7 @@ Feltételezés: két fő, fejenként heti négy edzés, alkalmanként hat gyakor
 gyakorlatonként négy sorozat; egy közös mentés teljes edzésenként.
 Új, hatgyakorlatos edzés: 30 dokumentumírás; egy négy sorozatos gyakorlat: 5; egy sorozat módosítása: 2 írás;
 változatlan bejegyzés ismételt mentése: 0 írás. Gépelés közben nincs írás.
-Ha mindketten edzetek aznap, az alapforgalom kb. 60 írás/nap.
+Ha mindannyian edzetek aznap, az alapforgalom kb. 60 írás/nap.
 
 Fejenként napi öt teljes újranyitással az induló adatolvasás kb. 5000/nap,
 szokásos frissítésekkel és jogosultságellenőrzéssel kb. 6000-8000/nap.

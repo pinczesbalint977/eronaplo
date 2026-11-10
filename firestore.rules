@@ -2,15 +2,20 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // Admin-managed document; no real UID or account information is committed.
-    // The list must contain exactly two distinct, nonempty UID strings.
+    // Keep existing two-person access while an administrator adds a third user.
+    // Only two or three distinct, nonempty UID strings are accepted.
     function allowedUser() {
       let uids = get(/databases/$(database)/documents/access/allowedUsers).data.uids;
       return request.auth != null
         && uids is list
-        && uids.size() == 2
+        && uids.size() in [2, 3]
         && uids[0] is string && uids[0].size() > 0
         && uids[1] is string && uids[1].size() > 0
         && uids[0] != uids[1]
+        && (uids.size() == 2 || (
+          uids[2] is string && uids[2].size() > 0
+          && uids[2] != uids[0] && uids[2] != uids[1]
+        ))
         && request.auth.uid in uids;
     }
 

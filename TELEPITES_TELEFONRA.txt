@@ -49,15 +49,15 @@ Példa: https://FELHASZNALONEV.github.io/eronaplo/
    Ha az Actions hibás, a piros lépés naplója megmutatja az okot.
    Hiányzó Firebase-változóknál a publikálás szándékosan megáll.
 
-2. FIREBASE ELLENŐRZÉS – CSAK A KÉT FIÓK
+2. FIREBASE ELLENŐRZÉS – CSAK A ENGEDÉLYEZETT FIÓKOK
 
 1) Firebase Console -> Authentication -> Settings -> Authorized domains
    -> Add domain: a GitHub Pages hostneve, például FELHASZNALONEV.github.io.
    Csak a hostnevet írd be: https://, /eronaplo/ és #/naplo nélkül.
-2) Authentication -> Users: a két saját email/jelszavas fiók maradjon meg.
+2) Authentication -> Users: az engedélyezett saját email/jelszavas fiókok maradjon meg.
    Az alkalmazásban nincs regisztrációs felület.
 3) Firestore -> Data: a már működő access / allowedUsers dokumentumban az
-   uids mező tömbként pontosan a két jó felhasználói UID-t tartalmazza.
+   uids mező tömbként két vagy három különböző, engedélyezett felhasználói UID-t tartalmazzon.
    Az access nevet pontosan írd: nem acces. Az engedélylista adminisztrátori
    adat; az app nem tudja olvasni vagy módosítani.
 4) Firestore -> Rules: a projekt firestore.rules fájljának megfelelő,
@@ -67,13 +67,13 @@ Példa: https://FELHASZNALONEV.github.io/eronaplo/
    csak egyszer szerepeljen. Utána Publish. A működő szabályokat a Pages
    domain felvétele miatt önmagában nem kell átírni.
 5) Új privát/inkognitó ablakban az alkalmazás csak bejelentkezést mutasson.
-   A két fiók külön saját adatokat lásson. Kijelentkezés után a napló ne
+   Minden engedélyezett fiók külön saját adatokat lásson. Kijelentkezés után a napló ne
    legyen elérhető. Az alkalmazás címének ismerete nem ad adathozzáférést.
 
 A statikus belépési oldal és az ikon nyilvános lehet. Az edzésadatokat a
 szerveroldali Firebase-szabályok védik; másnak nincs jogosultsága használni
 a védett funkciókat. Az engedélyezett domain beállítása önmagában nem
-adatvédelem: a két UID és a Firestore-szabályok is szükségesek.
+adatvédelem: az engedélyezett UID-lista és a Firestore-szabályok is szükségesek.
 
 3. ANDROID – CHROME
 
@@ -112,7 +112,7 @@ a Chrome-ot. A telepítéshez és az első betöltéshez internet kell.
 
 5. NAPI HASZNÁLAT ÉS FRISSÍTÉS
 
-Mindketten a saját telefonotokra telepítsétek, a saját fiókotokkal.
+Mindannyian a saját telefonotokra telepítsétek, a saját fiókotokkal.
 Edzéstervek -> terv készítése -> Edzés rögzítése -> terv kiválasztása ->
 értékek beírása az előző eredmények mellett -> Edzés mentése.
 Egy mentés az egész edzést a kiválasztott naptári naphoz rögzíti.
