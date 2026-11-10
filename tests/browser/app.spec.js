@@ -32,8 +32,8 @@ async function login(page, index) {
 async function noOverflow(page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 }
-const weight = (page, name, row, type = 'munkasorozat') => page.getByRole('spinbutton', { name: `${name} ${row}. ${type} súlya`, exact: true });
-const reps = (page, name, row, type = 'munkasorozat') => page.getByRole('spinbutton', { name: `${name} ${row}. ${type} ismétlése`, exact: true });
+const weight = (page, name, row) => page.getByRole('spinbutton', { name: `${name} ${row}. sorozat súlya`, exact: true });
+const reps = (page, name, row) => page.getByRole('spinbutton', { name: `${name} ${row}. sorozat ismétlése`, exact: true });
 async function selectDate(page, date) {
   await page.getByLabel('Naptár hónapja', { exact: true }).fill(date.slice(0,7));
   await page.getByRole('button', { name: date, exact: true }).click();
@@ -81,6 +81,38 @@ test('a manifest és a service worker a publikus appot offline is betölti', asy
   await context.setOffline(false);
 });
 
+test('egy kész gyakorlat ajánlását nem rejti el egy másik gyakorlat lassú vagy hibás előzménye', async ({ page }) => {
+  const origin = process.env.ERONAPLO_PREVIEW_URL || appUrl;
+  await page.route('**/__history-advice-fixture', (route) => route.fulfill({
+    contentType: 'text/html',
+    body: `<!doctype html><html lang="hu"><head><meta charset="utf-8"></head><body>
+      <div id="fixture-root"></div><script type="module">
+        import RefreshRuntime from '/@react-refresh';
+        RefreshRuntime.injectIntoGlobalHook(window);
+        window.$RefreshReg$ = () => {};
+        window.$RefreshSig$ = () => (type) => type;
+        window.__vite_plugin_react_preamble_installed__ = true;
+        await import('/tests/browser/fixtures/history-advice.jsx');
+      </script></body></html>`,
+  }));
+  const commits = [];
+  page.on('request', (request) => { if (request.url().endsWith('/documents:commit')) commits.push(request.url()); });
+  await page.goto(new URL('/__history-advice-fixture', origin).href);
+  const fast = page.getByRole('region', { name: 'Fixture gyors gyakorlat', exact: true });
+  const slow = page.getByRole('region', { name: 'Fixture lassú gyakorlat', exact: true });
+  await expect(fast.locator('.weight-recommendation')).toContainText(/Emelj.*ha úgy érzed/i);
+  await expect(fast.locator('.series-history')).toContainText('2021. február 3.');
+  await expect(slow.locator('.series-history')).toContainText(/keresése/i);
+  await expect(slow.getByText(/Emelj.*ha úgy érzed/i)).toHaveCount(0);
+  await page.evaluate(() => window.__rejectSlowHistory());
+  await expect(slow.getByRole('alert')).toContainText(/előzmény/i);
+  await expect(fast.getByRole('alert')).toHaveCount(0);
+  await expect(fast.locator('.weight-recommendation')).toContainText(/Emelj.*ha úgy érzed/i);
+  await expect(slow.getByText(/Emelj.*ha úgy érzed/i)).toHaveCount(0);
+  expect(await page.evaluate(() => window.__historyFixtureWrites)).toEqual([]);
+  expect(commits).toEqual([]);
+});
+
 test.describe.serial('Valódi Auth és Firestore emulátorral', () => {
   test.beforeAll(async ({ request }) => {
     expect((await request.delete('http://127.0.0.1:9099/emulator/v1/projects/demo-eronaplo/accounts')).ok()).toBe(true);
@@ -118,13 +150,11 @@ test.describe.serial('Valódi Auth és Firestore emulátorral', () => {
     await page.getByRole('button', { name: 'Új edzésterv', exact: true }).click();
     await page.getByLabel('Edzésterv neve', { exact: true }).fill(planName);
     await page.getByLabel('Gyakorlat neve', { exact: true }).fill(privateExercise);
-    await page.getByLabel('Bemelegítő sorozatok', { exact: true }).fill('0');
-    await page.getByLabel('Munkasorozatok', { exact: true }).fill('2');
+    await page.getByLabel('Sorozatok', { exact: true }).fill('2');
     await page.getByLabel('Ismétléscél', { exact: true }).fill('10');
     await page.getByRole('button', { name: /^Gyakorlat hozzáadása/ }).click();
     await page.getByLabel('Gyakorlat neve', { exact: true }).nth(1).fill(secondExercise);
-    await page.getByLabel('Bemelegítő sorozatok', { exact: true }).nth(1).fill('0');
-    await page.getByLabel('Munkasorozatok', { exact: true }).nth(1).fill('1');
+    await page.getByLabel('Sorozatok', { exact: true }).nth(1).fill('1');
     await page.getByLabel('Ismétléscél', { exact: true }).nth(1).fill('12');
     await noOverflow(page);
     expect(await page.getByRole('dialog').evaluate((dialog) => dialog.scrollWidth <= dialog.clientWidth)).toBe(true);
@@ -177,7 +207,7 @@ test.describe.serial('Valódi Auth és Firestore emulátorral', () => {
     await page.goto(`${appUrl}#/tervek`);
     await page.getByRole('button', { name: `${planName} terv szerkesztése`, exact: true }).click();
     await page.getByLabel('Gyakorlat neve', { exact: true }).first().fill('E2E jövőbeli gyakorlat');
-    await page.getByLabel('Munkasorozatok', { exact: true }).first().fill('1');
+    await page.getByLabel('Sorozatok', { exact: true }).first().fill('1');
     await page.getByRole('button', { name: 'Módosítások mentése', exact: true }).click();
     await page.goto(`${appUrl}#/naplo`);
     await selectDate(page, today);
@@ -239,13 +269,13 @@ test.describe.serial('Valódi Auth és Firestore emulátorral', () => {
     await expect(page.getByText(privateExercise, { exact: true })).toBeVisible();
   });
 
-  test('bemelegítés, munkasorozatok és mentett cél alapján megjelenő súlyajánlás', async ({ page }) => {
+  test('négy összes sorozat, első bemelegítés és az előző edzésből azonnal megjelenő súlyajánlás', async ({ page }) => {
     test.setTimeout(120000);
     const name = 'E2E bemelegítés és munkasorozatok';
     const exercise = 'E2E típusos fekvenyomás';
     const date = '2021-02-03';
-    const increaseMessage = 'Szép munka! Mindhárom munkasorozatban elérted a 10 ismétlést. A következő edzésen érdemes lehet növelned a súlyt!';
-    const maintainMessage = 'Érdemes lehet megtartanod ezt a súlyt, és az ismétlésszámot az előírt 10 ismétléses célig növelned.';
+    const increaseMessage = /Emelj.*ha úgy érzed/i;
+    const maintainMessage = /megtartanod ezt a súlyt/i;
     const commits = [];
     page.on('request', (request) => { if (request.url().endsWith('/documents:commit')) commits.push(request.postDataJSON()); });
     await page.goto(`${appUrl}#/tervek`);
@@ -254,8 +284,9 @@ test.describe.serial('Valódi Auth és Firestore emulátorral', () => {
     await page.getByRole('button', { name: 'Új edzésterv', exact: true }).click();
     await page.getByLabel('Edzésterv neve', { exact: true }).fill(name);
     await page.getByLabel('Gyakorlat neve', { exact: true }).fill(exercise);
-    await expect(page.getByLabel('Bemelegítő sorozatok', { exact: true })).toHaveValue('1');
-    await expect(page.getByLabel('Munkasorozatok', { exact: true })).toHaveValue('3');
+    await expect(page.getByLabel('Sorozatok', { exact: true })).toHaveValue('4');
+    await expect(page.getByLabel('Bemelegítő sorozatok', { exact: true })).toHaveCount(0);
+    await expect(page.getByLabel('Munkasorozatok', { exact: true })).toHaveCount(0);
     await expect(page.getByLabel('Ismétléscél', { exact: true })).toHaveValue('10');
     await noOverflow(page);
     expect(await page.getByRole('dialog').evaluate((dialog) => dialog.scrollWidth <= dialog.clientWidth)).toBe(true);
@@ -266,11 +297,15 @@ test.describe.serial('Valódi Auth és Firestore emulátorral', () => {
     await page.getByLabel('Edzés dátuma', { exact: true }).fill(date);
     const dialog = page.getByRole('dialog');
     await expect(dialog.locator('input[aria-label$="sorozat súlya"]')).toHaveCount(4);
+    await expect(dialog.locator('.series-columns')).toHaveCount(1);
+    await expect(dialog.locator('.series-row')).toHaveCount(4);
+    await expect(dialog.locator('.series-row').first().getByText('Bemelegítő', { exact: true })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: /Bemelegítő sorozat hozzáadása/i })).toHaveCount(0);
     await expect(dialog.locator('.weight-recommendation')).toHaveCount(0);
-    await weight(page, exercise, 1, 'bemelegítő sorozat').fill('20');
-    await reps(page, exercise, 1, 'bemelegítő sorozat').fill('1');
-    for (let row = 1; row <= 3; row++) {
-      await weight(page, exercise, row).fill('60');
+    await weight(page, exercise, 1).fill('80');
+    await reps(page, exercise, 1).fill('10');
+    for (let row = 2; row <= 4; row++) {
+      await weight(page, exercise, row).fill('140');
       await reps(page, exercise, row).fill('10');
     }
     await expect(dialog.locator('.weight-recommendation')).toHaveCount(0);
@@ -288,31 +323,42 @@ test.describe.serial('Valódi Auth és Firestore emulátorral', () => {
     expect(rows.map((write) => write.update.fields.type.stringValue)).toEqual(['warmup','work','work','work']);
     await selectDate(page, date);
     const card = page.locator('.session-card').filter({ has: page.getByRole('heading', { name, exact: true }) });
-    await expect(card.getByText(increaseMessage, { exact: true })).toBeVisible();
-    const beforeDismiss = commits.length;
-    await card.getByRole('button', { name: `${exercise} ajánlás elrejtése`, exact: true }).click();
     await expect(card.locator('.weight-recommendation')).toHaveCount(0);
-    expect(commits).toHaveLength(beforeDismiss);
 
-    // A new session copies warmup and work independently; the unsaved modal has no advice.
+    // Advice comes from the completed prior workout as soon as the new modal opens.
     const today = await page.evaluate(() => new Date().toLocaleDateString('sv-SE'));
     await selectDate(page, today);
+    const beforeOpen = commits.length;
     await openSession(page, name);
-    await expect(weight(page, exercise, 1, 'bemelegítő sorozat')).toHaveValue('20');
-    await expect(reps(page, exercise, 1, 'bemelegítő sorozat')).toHaveValue('1');
-    for (let row = 1; row <= 3; row++) {
-      await expect(weight(page, exercise, row)).toHaveValue('60');
+    await expect(dialog.locator('.series-history')).toContainText('2021. február 3.');
+    await expect(dialog.locator('.weight-recommendation')).toContainText(increaseMessage);
+    await expect(dialog.locator('.weight-recommendation')).not.toContainText(/\+\s*\d+(?:[,.]\d+)?\s*kg/i);
+    await expect(dialog.locator('.weight-recommendation')).not.toContainText(/\b(?:2[,.]5|5)\s*kg/i);
+    await expect(dialog.locator('input[aria-label$="sorozat súlya"]')).toHaveCount(4);
+    await expect(dialog.locator('.series-columns')).toHaveCount(1);
+    await expect(dialog.locator('.series-row')).toHaveCount(4);
+    await expect(dialog.locator('.series-row').first().getByText('Bemelegítő', { exact: true })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: /Bemelegítő sorozat hozzáadása/i })).toHaveCount(0);
+    await expect(weight(page, exercise, 1)).toHaveValue('80');
+    await expect(reps(page, exercise, 1)).toHaveValue('10');
+    for (let row = 2; row <= 4; row++) {
+      await expect(weight(page, exercise, row)).toHaveValue('140');
       await expect(reps(page, exercise, row)).toHaveValue('10');
     }
+    expect(commits).toHaveLength(beforeOpen);
+    const beforeDismiss = commits.length;
+    await dialog.getByRole('button', { name: `${exercise} ajánlás elrejtése`, exact: true }).click();
     await expect(dialog.locator('.weight-recommendation')).toHaveCount(0);
+    await expect(weight(page, exercise, 1)).toHaveValue('80');
+    for (let row = 2; row <= 4; row++) await expect(weight(page, exercise, row)).toHaveValue('140');
+    expect(commits).toHaveLength(beforeDismiss);
     await page.getByRole('button', { name: 'Mégse', exact: true }).click();
     expect(commits).toHaveLength(beforeDismiss);
 
     // The saved session keeps its original types and target when the template changes.
     await page.goto(`${appUrl}#/tervek`);
     await page.getByRole('button', { name: `${name} terv szerkesztése`, exact: true }).click();
-    await page.getByLabel('Bemelegítő sorozatok', { exact: true }).fill('0');
-    await page.getByLabel('Munkasorozatok', { exact: true }).fill('2');
+    await page.getByLabel('Sorozatok', { exact: true }).fill('3');
     await page.getByLabel('Ismétléscél', { exact: true }).fill('12');
     await page.getByRole('button', { name: 'Módosítások mentése', exact: true }).click();
     await expect(dialog).toHaveCount(0);
@@ -320,22 +366,35 @@ test.describe.serial('Valódi Auth és Firestore emulátorral', () => {
     await page.reload();
     await selectDate(page, date);
     await card.getByRole('button', { name: `${name} edzés szerkesztése`, exact: true }).click();
-    await expect(weight(page, exercise, 1, 'bemelegítő sorozat')).toHaveValue('20');
-    await expect(dialog.locator('input[aria-label$="munkasorozat súlya"]')).toHaveCount(3);
-    await expect(reps(page, exercise, 3)).toHaveValue('10');
-    await reps(page, exercise, 1).fill('9');
+    await expect(weight(page, exercise, 1)).toHaveValue('80');
+    await expect(dialog.locator('input[aria-label$="sorozat súlya"]')).toHaveCount(4);
+    await expect(reps(page, exercise, 4)).toHaveValue('10');
+    await reps(page, exercise, 2).fill('9');
     await saveSession(page);
     const editedParent = commits.at(-1).writes.find((write) => /\/workouts\//.test(write.update?.name));
     expect(editedParent.update.fields.plannedWorkSets).toEqual({integerValue:'3'});
     expect(editedParent.update.fields.targetReps).toEqual({integerValue:'10'});
-    await expect(card.getByText(maintainMessage, { exact: true })).toBeVisible();
-    await expect(card.getByText(increaseMessage, { exact: true })).toHaveCount(0);
+    await expect(card.locator('.weight-recommendation')).toHaveCount(0);
+    await selectDate(page, today);
+    await openSession(page, name);
+    await expect(dialog.locator('.series-history')).toContainText('2021. február 3.');
+    await expect(dialog.locator('.weight-recommendation')).toContainText(maintainMessage);
+    await expect(dialog.locator('.weight-recommendation')).toContainText('12 ismétlés');
+    await expect(dialog.getByText(increaseMessage)).toHaveCount(0);
     await noOverflow(page);
+    await page.getByRole('button', { name: 'Mégse', exact: true }).click();
+    await selectDate(page, date);
     await card.getByRole('button', { name: `${name} edzés szerkesztése`, exact: true }).click();
-    await weight(page, exercise, 2).fill('65');
+    await weight(page, exercise, 3).fill('145');
     await saveSession(page);
     await expect(card.locator('.weight-recommendation')).toHaveCount(0);
+    await selectDate(page, today);
+    await openSession(page, name);
+    await expect(dialog.locator('.series-history')).toContainText('2021. február 3.');
+    await expect(dialog.getByText(increaseMessage)).toHaveCount(0);
+    await page.getByRole('button', { name: 'Mégse', exact: true }).click();
     // Keep the later pagination fixture's exact document budget independent.
+    await selectDate(page, date);
     await card.getByRole('button', { name: `${name} teljes edzés törlése`, exact: true }).click();
     await page.getByRole('button', { name: 'Végleges törlés', exact: true }).click();
     await expect(card).toHaveCount(0);

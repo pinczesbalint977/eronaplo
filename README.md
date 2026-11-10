@@ -4,7 +4,7 @@ Magyar nyelvű, mobilra tervezett edzésnapló legfeljebb három embernek. React
 
 A GitHub Pages beállításának és a telefonos telepítésnek a lépései a [TELEPITES_TELEFONRA.txt](TELEPITES_TELEFONRA.txt) fájlban vannak. A stílushoz illő lime súlyzóikon Androidra, maskable változatban és iPhone-ra is elkészül; minden build újragenerálja.
 
-Az új bemelegítő/munkasorozat-kezelés, a kizárólag tájékoztató súlyajánlás, a régi adatok megőrzése és a **szabályok → frontend** élesítési sorrend részletes leírása: [BEMELEGITES_ES_SULYAJANLAS.md](BEMELEGITES_ES_SULYAJANLAS.md). Új gyakorlat alapértéke 1 bemelegítő + 3 munkasorozat, 10-es ismétléscél; a régi tervek sorozatszámát nem írjuk át. Az ajánlás a mentett gyakorlatoknál jelenik meg, helyi számítással, extra Firebase-művelet és konkrét kilogrammjavaslat nélkül.
+Az új bemelegítő/munkasorozat-kezelés, a kizárólag tájékoztató súlyajánlás, a régi adatok megőrzése és a **szabályok → frontend** élesítési sorrend részletes leírása: [BEMELEGITES_ES_SULYAJANLAS.md](BEMELEGITES_ES_SULYAJANLAS.md). Az alapérték összesen 4 sor: az első bemelegítő, a többi munka, 10-es ismétléscéllal. A régi négy sor is négy marad. Az ajánlás az új edzésnél, a korábbi befejezett eredmény után jelenik meg, helyi számítással, extra Firebase-művelet és konkrét kilogrammjavaslat nélkül.
 
 A repository kizárólag forráskódot és telepítési fájlokat tartalmaz. A valódi email-címek, jelszavak, engedélyezett UID-k és edzésadatok a Firebase-ben maradnak. Az alábbi példaértékeket cseréld ki a saját beállításaidra; személyes adatot ne írj a README-be vagy a forráskódba.
 
@@ -216,9 +216,10 @@ Az éles Firebase-konfiguráció és a valódi telefonok beállítása után ell
 
 ### Elkészült helyi ellenőrzések – 2026. november 10.
 
-- **56/56 unit teszt**: régi tervek és naplók, típusonkénti előtöltés, ajánlási feltételek, célértékek, atomi és írástakarékos mentés, elérési utak.
+- **61/61 unit teszt**: régi tervek és naplók, sorrendet megőrző előtöltés, ajánlási feltételek, célértékek, atomi és írástakarékos mentés, elérési utak.
 - **35/35 Firestore Security Rules teszt**: a három fiók elkülönítése, illetéktelen hozzáférés tiltása, régi és új sorozatformátumok, célértékek, mezők megőrzése és 210 dokumentumos atomi edzésmentés.
-- **18/18 Chromium/WebKit böngészőteszt**: meglévő folyamatok, új 1+3/10 alapértékek, bemelegítés és munka külön előtöltése, mentett ajánlás, elrejtés, egyéni célok pillanatképei, hálózati hibák és hozzáférésvédelem. Újrapróbálás nélkül sikeres.
+- **18/18 Chromium/WebKit böngészőteszt**: meglévő folyamatok, összesen négy sor megőrzése, első sor bemelegítőként, az eredeti sorrendű előtöltés, előző edzésből megjelenő ajánlás, elrejtés, egyéni célok pillanatképei, hálózati hibák és hozzáférésvédelem. Újrapróbálás nélkül sikeres.
+- A legutóbbi javítás külön **2/2 Chromium/WebKit regressziótesztje** is sikeres: egy lassú vagy hibás előzménykeresés nem rejti el a másik gyakorlat ajánlását. Az élesítést megelőző Actions-folyamat már mind a 20 böngészőtesztet lefuttatja.
 - Sikeres éles build és PWA-ellenőrzés: manifest, ikonméretek, service worker és offline előtöltés.
 - Mobilos, tabletes, asztali és fekvő méretek; az új terv- és sorozatfelület 320 px szélességen sem lóg ki.
 

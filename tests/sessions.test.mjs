@@ -10,27 +10,32 @@ describe('Structured plans', () => {
     const { id, ...item } = newPlanItem();
     assert.equal(id.length, 8);
     assert.deepEqual(item, { name: '', sets: 3, reps: 10, warmupSets: 1 });
-    assert.equal(newPlanItem('Custom', 2, 12, 0).warmupSets, 0);
+    assert.equal(newPlanItem('Custom', 2, 12).warmupSets, 1);
   });
 
   it('keeps version one plans additive and roundtrips older counts, values and IDs', () => {
     const legacyItems = [{ id: 'existing-a', name: 'Squat', sets: 4, reps: 8 }, { id: 'existing-b', name: 'Row', sets: 20, reps: 100 }];
     const parsed = parsePlan(JSON.stringify({ version: 1, items: legacyItems }));
-    assert.deepEqual(parsed, legacyItems.map((item) => ({ ...item, warmupSets: 0 })));
+    assert.deepEqual(parsed, legacyItems.map((item) => ({ ...item, sets: item.sets - 1, warmupSets: 1 })));
     const encoded = encodePlan(legacyItems);
     assert.equal(JSON.parse(encoded).version, 1);
+    assert.deepEqual(JSON.parse(encoded).items, legacyItems);
     assert.deepEqual(parsePlan(encoded), parsed);
     assert.deepEqual(legacyItems[0], { id: 'existing-a', name: 'Squat', sets: 4, reps: 8 });
-    assert.ok(parsePlan('Squat 4x8\nRow 3x12').every((item) => item.warmupSets === 0));
+    assert.ok(parsePlan('Squat 4x8\nRow 3x12').every((item) => item.warmupSets === 1));
+    assert.deepEqual(parsePlan('Squat 4x8\nRow 1x12').map(({ sets, warmupSets }) => [sets, warmupSets]), [[3, 1], [0, 1]]);
+    assert.deepEqual(parsePlan(JSON.stringify({ version: 1, items: [{ ...legacyItems[0], sets: 3, warmupSets: 2 }] }))[0], { ...legacyItems[0], sets: 4, warmupSets: 1 });
   });
 
-  it('validates separate warmup and work counts within the total row limit', () => {
+  it('preserves total row counts while canonicalizing to one warmup', () => {
     const item = newPlanItem('Squat');
-    assert.equal(parsePlan(encodePlan([{ ...item, sets: 1, warmupSets: 19 }]))[0].warmupSets, 19);
-    for (const change of [{ warmupSets: -1 }, { warmupSets: 20 }, { warmupSets: 0.5 }, { warmupSets: '1' }, { warmupSets: null }, { sets: 20, warmupSets: 1 }, { sets: 0, warmupSets: 1 }]) {
+    assert.deepEqual(JSON.parse(encodePlan([item])).items[0], { id: item.id, name: item.name, sets: 4, reps: item.reps });
+    assert.deepEqual(parsePlan(encodePlan([{ ...item, sets: 1, warmupSets: 19 }]))[0], { ...item, sets: 19 });
+    for (const change of [{ warmupSets: -1 }, { warmupSets: 20 }, { warmupSets: 0.5 }, { warmupSets: '1' }, { warmupSets: null }, { sets: 20, warmupSets: 1 }, { sets: -1, warmupSets: 1 }, { sets: 0, warmupSets: 0 }]) {
       assert.throws(() => encodePlan([{ ...item, ...change }]));
     }
-    assert.equal(parsePlan(encodePlan([{ ...item, sets: 20, warmupSets: 0 }]))[0].sets, 20);
+    assert.equal(parsePlan(encodePlan([{ ...item, sets: 20, warmupSets: 0 }]))[0].sets, 19);
+    assert.equal(parsePlan(encodePlan([{ ...item, sets: 0, warmupSets: 1 }]))[0].sets, 0);
   });
   it('roundtrips stable IDs, order and Unicode with independent objects', () => {
     const items = [newPlanItem('Guggolás 🏋️', 4, 8), newPlanItem('Evezés', 3, 10)];
@@ -48,8 +53,8 @@ describe('Structured plans', () => {
     const text = ' Guggolás — 4 × 8\r\nEvezés 3x12\nVállból nyomás\nGuggolás — 4 × 8';
     const parsed = parsePlan(text);
     assert.deepEqual(parsed.map(({ name, sets, reps }) => ({ name, sets, reps })), [
-      { name: 'Guggolás', sets: 4, reps: 8 }, { name: 'Evezés', sets: 3, reps: 12 },
-      { name: 'Vállból nyomás', sets: 3, reps: 10 }, { name: 'Guggolás', sets: 4, reps: 8 },
+      { name: 'Guggolás', sets: 3, reps: 8 }, { name: 'Evezés', sets: 2, reps: 12 },
+      { name: 'Vállból nyomás', sets: 2, reps: 10 }, { name: 'Guggolás', sets: 3, reps: 8 },
     ]);
     assert.deepEqual(parsePlan(text), parsed);
     assert.equal(new Set(parsed.map(({ id }) => id)).size, 4);
@@ -65,7 +70,7 @@ describe('Structured plans', () => {
     const item = newPlanItem('Guggolás');
     assert.throws(() => encodePlan([]), /1–10/);
     assert.throws(() => encodePlan([item, item]), /egyedinek/);
-    for (const change of [{ name: '' }, { name: 'a'.repeat(101) }, { sets: 0 }, { sets: 21 }, { sets: 2.5 }, { reps: 101 }, { reps: '10' }]) {
+    for (const change of [{ name: '' }, { name: 'a'.repeat(101) }, { sets: -1 }, { sets: 20 }, { sets: 2.5 }, { reps: 101 }, { reps: '10' }]) {
       assert.throws(() => encodePlan([{ ...item, ...change }]));
     }
     const hugeIds = Array.from({ length: 10 }, (_, i) => ({ ...item, id: `${i}${'a'.repeat(400)}` }));

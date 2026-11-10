@@ -8,8 +8,8 @@ const legacyId = (value, index) => {
   return `legacy-${index}-${(hash >>> 0).toString(36)}`;
 };
 
-export function newPlanItem(name = '', sets = 3, reps = 10, warmupSets = 1) {
-  return { id: crypto.randomUUID().slice(0, 8), name, sets, reps, warmupSets };
+export function newPlanItem(name = '', sets = 3, reps = 10) {
+  return { id: crypto.randomUUID().slice(0, 8), name, sets, reps, warmupSets: 1 };
 }
 
 // Parsing never truncates an older plan: the editor can explain any invalid limits.
@@ -21,8 +21,8 @@ export function parsePlan(exercisesString) {
       && parsed.items.every((item) => item && typeof item === 'object' && !Array.isArray(item))) {
       return parsed.items.map((item, index) => ({
         id: typeof item.id === 'string' && item.id ? item.id : legacyId(JSON.stringify(item), index),
-        name: item.name ?? '', sets: item.sets ?? 3, reps: item.reps ?? 10,
-        warmupSets: Object.hasOwn(item, 'warmupSets') ? item.warmupSets : 0,
+        name: item.name ?? '', sets: (item.sets ?? 3) + (item.warmupSets ?? 0) - 1, reps: item.reps ?? 10,
+        warmupSets: 1,
       }));
     }
   } catch { /* Older plans contain ordinary multiline text. */ }
@@ -31,9 +31,9 @@ export function parsePlan(exercisesString) {
     return {
       id: legacyId(line, index),
       name: match && match[1].trim() ? match[1].trim() : line,
-      sets: match && match[1].trim() ? Number(match[2]) : 3,
+      sets: (match && match[1].trim() ? Number(match[2]) : 3) - 1,
       reps: match && match[1].trim() ? Number(match[3]) : 10,
-      warmupSets: 0,
+      warmupSets: 1,
     };
   });
 }
@@ -52,11 +52,13 @@ export function encodePlan(items) {
       throw new Error('A gyakorlat neve 1–100 karakter lehet.');
     }
     const warmupSets = item.warmupSets === undefined ? 0 : item.warmupSets;
-    if (!validInteger(item.sets, 1, 20) || !validInteger(item.reps, 1, 100)
-      || !validInteger(warmupSets, 0, 19) || item.sets + warmupSets > 20) {
+    const total = item.sets + warmupSets;
+    if (!validInteger(item.sets, warmupSets === 0 ? 1 : 0, 20) || !validInteger(item.reps, 1, 100)
+      || !validInteger(warmupSets, 0, 19) || !validInteger(total, 1, 20)) {
       throw new Error('Gyakorlatonként 1–20 sorozat és 1–100 ismétlés adható meg.');
     }
-    return { id: item.id, name: item.name.trim(), sets: item.sets, reps: item.reps, warmupSets };
+    // Persist the total so older clients keep the same number of rows.
+    return { id: item.id, name: item.name.trim(), sets: total, reps: item.reps };
   });
   const result = JSON.stringify({ version: 1, items: normalized });
   if (result.length > 4000) throw new Error('Az edzésterv túl hosszú. Rövidítsd a gyakorlatok nevét.');

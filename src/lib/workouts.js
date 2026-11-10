@@ -23,46 +23,72 @@ export function getSets(entry) {
 // Rows written before set types existed are working sets.
 export const getSetType = (row) => row?.type === 'warmup' ? 'warmup' : 'work';
 
-export function prefillPlanSets(planItem, previous) {
-  const priorRows = Array.isArray(previous) ? previous : getSets(previous);
-  const groups = {
-    warmup: priorRows.filter((row) => getSetType(row) === 'warmup'),
-    work: priorRows.filter((row) => getSetType(row) === 'work'),
-  };
-  return [['warmup', planItem.warmupSets ?? 0], ['work', planItem.sets]].flatMap(([type, count]) => (
-    Array.from({ length: count }, (_, index) => ({
-      weight: groups[type][index]?.weight ?? '',
-      reps: groups[type][index]?.reps ?? planItem.reps,
-      completed: false,
-      type,
-      touched: false,
-    }))
-  ));
+// The first displayed row is always the warmup; stored rows remain untouched.
+export function getPositionedSets(entryOrRows) {
+  const rows = Array.isArray(entryOrRows) ? entryOrRows : getSets(entryOrRows);
+  return rows.map((row, index) => ({ ...row, type: index === 0 ? 'warmup' : 'work' }));
 }
 
-export function getWeightRecommendation(entry) {
-  if (entry?.status !== 'completed' || entry.incomplete || entry.metadata?.incomplete) return null;
-  const { plannedWorkSets, targetReps } = entry;
-  if (!Number.isInteger(plannedWorkSets) || plannedWorkSets < 1 || plannedWorkSets > 20
-    || !Number.isInteger(targetReps) || targetReps < 1 || targetReps > 100) return null;
+export function getPlannedWorkSets(entry) {
+  const planned = entry?.plannedWorkSets;
   const rows = getSets(entry);
-  if (rows.some((row) => Object.hasOwn(row, 'type') && row.type !== 'warmup' && row.type !== 'work')) return null;
-  const work = rows.filter((row) => getSetType(row) === 'work');
-  if (work.length < plannedWorkSets || work.some((row) => row.completed !== true
-    || !Number.isFinite(row.weight) || row.weight < 0 || row.weight > 1000
-    || !Number.isInteger(row.reps) || row.reps < 1 || row.reps > 100
-    || row.weight !== work[0].weight)) return null;
+  return Number.isInteger(planned) && rows.length > 0 && planned === rows.length
+    && !rows.some((row) => row.type === 'warmup') ? planned - 1 : planned;
+}
+
+export function prefillPlanSets(planItem, previous) {
+  const priorRows = getPositionedSets(previous);
+  return Array.from({ length: planItem.sets + 1 }, (_, index) => ({
+    weight: priorRows[index]?.weight ?? '',
+    reps: priorRows[index]?.reps ?? planItem.reps,
+    completed: false,
+    type: index === 0 ? 'warmup' : 'work',
+    touched: false,
+  }));
+}
+
+export function getWeightRecommendation(entry, prescription = {}) {
+  const feedback = getWeightFeedback(entry, prescription);
+  return feedback.kind === 'info' ? null : feedback;
+}
+
+// A current plan can supply the next workout's goal without changing saved history.
+export function getWeightFeedback(entry, prescription = {}) {
+  const info = (message) => ({ kind: 'info', message });
+  if (!entry || entry.incomplete || entry.metadata?.incomplete) {
+    return info('Az előző edzés adatai hiányosak, ezért még nincs súlyajánlás.');
+  }
+  if (entry.status !== 'completed') {
+    return info('Az előző edzés nincs befejezve, ezért még nincs súlyajánlás.');
+  }
+  const plannedWorkSets = prescription.plannedWorkSets ?? getPlannedWorkSets(entry);
+  const targetReps = prescription.targetReps ?? entry.targetReps;
+  if (!Number.isInteger(plannedWorkSets) || plannedWorkSets < 1 || plannedWorkSets > 20
+    || !Number.isInteger(targetReps) || targetReps < 1 || targetReps > 100) {
+    return info('A munkasorozatok száma vagy az ismétléscél hiányzik vagy nem megfelelő, ezért nincs súlyajánlás.');
+  }
+  const work = getPositionedSets(entry).slice(1);
+  if (work.length < plannedWorkSets || work.some((row) => row.completed !== true)) {
+    return info('Az előző edzésben nem teljesült minden szükséges munkasorozat, ezért még nincs súlyajánlás.');
+  }
+  if (work.some((row) => !Number.isFinite(row.weight) || row.weight < 0 || row.weight > 1000
+    || !Number.isInteger(row.reps) || row.reps < 1 || row.reps > 100)) {
+    return info('Az előző munkasorozatok adatai hiányosak vagy nem megfelelőek, ezért nincs súlyajánlás.');
+  }
+  if (work.some((row) => row.weight !== work[0].weight)) {
+    return info('Az előző munkasorozatokban eltérő súlyok szerepeltek, ezért nincs egységes súlyajánlás.');
+  }
   if (work.every((row) => row.reps >= targetReps)) {
     return {
       kind: 'increase',
       message: plannedWorkSets === 3 && targetReps === 10 && work.length === 3
-        ? 'Szép munka! Mindhárom munkasorozatban elérted a 10 ismétlést. A következő edzésen érdemes lehet növelned a súlyt!'
-        : `Szép munka! Minden munkasorozatban elérted az előírt ${targetReps} ismétlést. A következő edzésen érdemes lehet növelned a súlyt!`,
+        ? 'Múltkor mindhárom munkasorozatban megvolt a 10 ismétlés. Emelj, ha úgy érzed!'
+        : `Múltkor minden munkasorozatban megvolt az előírt ${targetReps} ismétlés. Emelj, ha úgy érzed!`,
     };
   }
   return {
     kind: 'maintain',
-    message: `Érdemes lehet megtartanod ezt a súlyt, és az ismétlésszámot az előírt ${targetReps} ismétléses célig növelned.`,
+    message: `Érdemes lehet megtartanod ezt a súlyt az előírt ${targetReps} ismétléses célig.`,
   };
 }
 
@@ -110,7 +136,16 @@ export function previousWorkout(entries, exercise, beforeDate, excludeId) {
   const selected = sameDay.filter((entry) => session
     ? decodeSessionNotes(entry.notes)?.sessionId === session.sessionId
     : !decodeSessionNotes(entry.notes));
-  return { date, setResults: selected.flatMap(getSets) };
+  const result = { date, setResults: selected.flatMap(getSets) };
+  if (selected.length === 1) {
+    const saved = selected[0];
+    for (const field of ['plannedWorkSets', 'targetReps', 'incomplete', 'metadata']) {
+      if (Object.hasOwn(saved, field)) result[field] = saved[field];
+    }
+    // Older snapshots sometimes counted every untyped row as a work set.
+    if (Object.hasOwn(saved, 'plannedWorkSets')) result.plannedWorkSets = getPlannedWorkSets(saved);
+  }
+  return result;
 }
 
 export function compareSet(current, previous) {
