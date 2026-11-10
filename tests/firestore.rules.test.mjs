@@ -48,9 +48,8 @@ const setWorkout = (overrides = {}) => ({
   exercise: 'Guggolás',
   date: '2026-11-08',
   notes: '',
-  setResults: [{ weight: 42.5, reps: 10, completed: true }],
   status: 'completed',
-  setCount: Array.isArray(overrides.setResults) ? overrides.setResults.length : 1,
+  setCount: 1,
   createdAt: serverTimestamp(),
   updatedAt: serverTimestamp(),
   ...overrides,
@@ -107,9 +106,9 @@ describe('Server-side authorization', () => {
       const db = database(uid);
       await assertSucceeds(getDoc(doc(db, 'users', uid, 'access', 'check')));
       const records = [
-        ['workouts', 'entry', workout(), { weight: 45, updatedAt: serverTimestamp() }],
+        ['workouts', 'entry', setWorkout({ plannedWorkSets: 3, targetReps: 10 }), { targetReps: 8, updatedAt: serverTimestamp() }],
         ['plans', 'plan', plan(), { name: 'Updated plan', updatedAt: serverTimestamp() }],
-        ['workoutSets', 'entry_0', { workoutId: 'entry', index: 0, weight: 40, reps: 8, completed: false }, { weight: 45, completed: true }],
+        ['workoutSets', 'entry_0', { workoutId: 'entry', index: 0, weight: 40, reps: 8, completed: false, type: 'warmup' }, { weight: 45, completed: true, type: 'work' }],
       ];
       for (const [name, id, data, changes] of records) {
         const ref = doc(db, 'users', uid, name, id);
@@ -126,9 +125,9 @@ describe('Server-side authorization', () => {
     const approved = [FIRST, SECOND, THIRD];
     await adminSet('access/allowedUsers', { uids: approved });
     const records = [
-      ['workouts', 'entry', workout(), { weight: 45, updatedAt: serverTimestamp() }],
+      ['workouts', 'entry', setWorkout({ plannedWorkSets: 3, targetReps: 10 }), { targetReps: 8, updatedAt: serverTimestamp() }],
       ['plans', 'plan', plan(), { name: 'Changed plan', updatedAt: serverTimestamp() }],
-      ['workoutSets', 'entry_0', { workoutId: 'entry', index: 0, weight: 40, reps: 8, completed: false }, { completed: true }],
+      ['workoutSets', 'entry_0', { workoutId: 'entry', index: 0, weight: 40, reps: 8, completed: false, type: 'work' }, { completed: true, type: 'warmup' }],
     ];
     for (const owner of approved) {
       for (const [name, id, data] of records) {
@@ -158,9 +157,9 @@ describe('Server-side authorization', () => {
     const db = database(OUTSIDER);
     await assertFails(getDoc(doc(db, 'users', OUTSIDER, 'access', 'check')));
     for (const [name, id, data] of [
-      ['workouts', 'entry', workout()],
+      ['workouts', 'entry', setWorkout({ plannedWorkSets: 3, targetReps: 10 })],
       ['plans', 'plan', plan()],
-      ['workoutSets', 'entry_0', { workoutId: 'entry', index: 0, weight: 40, reps: 8, completed: false }],
+      ['workoutSets', 'entry_0', { workoutId: 'entry', index: 0, weight: 40, reps: 8, completed: false, type: 'warmup' }],
     ]) {
       const ref = doc(db, 'users', OUTSIDER, name, id);
       await assertFails(getDoc(ref));
@@ -326,8 +325,8 @@ describe('Per-set workouts', () => {
   });
   it('atomically saves twenty different sets within the rules budget', async () => {
     const db = database(FIRST), batch = writeBatch(db);
-    batch.set(doc(db, 'users', FIRST, 'workouts', 'entry'), parent(20));
-    for (let i = 0; i < 20; i++) batch.set(doc(db, 'users', FIRST, 'workoutSets', 'entry_' + i), row(i, { weight: 50 + i, reps: 5 + i, completed: true }));
+    batch.set(doc(db, 'users', FIRST, 'workouts', 'entry'), { ...parent(20), plannedWorkSets: 18, targetReps: 10 });
+    for (let i = 0; i < 20; i++) batch.set(doc(db, 'users', FIRST, 'workoutSets', 'entry_' + i), row(i, { weight: 50 + i, reps: 5 + i, completed: true, type: i < 2 ? 'warmup' : 'work' }));
     await assertSucceeds(batch.commit());
     assert.equal((await assertSucceeds(getDocs(collection(db, 'users', FIRST, 'workoutSets')))).size, 20);
   });
@@ -340,11 +339,11 @@ describe('Per-set workouts', () => {
           sessionId, planId: 'test-plan', planName: 'Maximum session', position, exerciseCount: 10, note: '',
         });
         batch.set(doc(db, 'users', FIRST, 'workouts', workoutId), {
-          ...parent(20), exercise: `Exercise ${position + 1}`, status: 'completed', notes,
+          ...parent(20), exercise: `Exercise ${position + 1}`, status: 'completed', notes, plannedWorkSets: 18, targetReps: 8,
         });
         for (let index = 0; index < 20; index++) {
           batch.set(doc(db, 'users', FIRST, 'workoutSets', `${workoutId}_${index}`),
-            row(index, { workoutId, weight: 50 + position, reps: 8, completed: true }));
+            row(index, { workoutId, weight: 50 + position, reps: 8, completed: true, type: index < 2 ? 'warmup' : 'work' }));
         }
       }
       return batch;
@@ -375,6 +374,85 @@ describe('Per-set workouts', () => {
     for (const values of [{ status: 'invalid' }, { exercise: '' }, { extra: true }, { createdAt: Timestamp.fromMillis(0) }]) await assertFails(setDoc(workoutRef(), { ...parent(), ...values }));
     await assertSucceeds(setDoc(workoutRef(), parent()));
     await assertFails(updateDoc(workoutRef(), { createdAt: Timestamp.fromMillis(0), updatedAt: serverTimestamp() }));
+  });
+  it('accepts both typed roles and unchanged legacy row documents', async () => {
+    for (const [index, type] of [[0, 'warmup'], [1, 'work']]) {
+      await assertSucceeds(setDoc(rowRef(FIRST, index), row(index, { type })));
+      assert.equal((await assertSucceeds(getDoc(rowRef(FIRST, index)))).data().type, type);
+    }
+    await assertSucceeds(setDoc(rowRef(FIRST, 2), row(2)));
+    assert.equal(Object.hasOwn((await getDoc(rowRef(FIRST, 2))).data(), 'type'), false);
+    await assertSucceeds(setDoc(rowRef(FIRST, 2), row(2, { weight: 65 })));
+    await assertSucceeds(updateDoc(rowRef(FIRST, 2), { completed: true }));
+    await assertSucceeds(updateDoc(rowRef(), { type: 'work' }));
+    await assertSucceeds(updateDoc(rowRef(), { type: 'warmup' }));
+  });
+  it('preserves saved row roles against deletion and old-client full replacements', async () => {
+    for (const [index, type] of [[0, 'warmup'], [1, 'work']]) {
+      const ref = rowRef(FIRST, index);
+      await assertSucceeds(setDoc(ref, row(index, { type })));
+      await assertFails(updateDoc(ref, { type: deleteField() }));
+      await assertFails(setDoc(ref, row(index, { weight: 65 })));
+      await assertSucceeds(updateDoc(ref, { weight: 65 }));
+      assert.equal((await assertSucceeds(getDoc(ref))).data().type, type);
+    }
+  });
+  it('rejects invalid roles and extra fields on typed and legacy rows', async () => {
+    for (const type of ['', 'warm-up', 'WORK', 'cooldown', null, 1, true, ['work'], { role: 'work' }]) {
+      await assertFails(setDoc(rowRef(), row(0, { type })));
+    }
+    await assertFails(setDoc(rowRef(), row(0, { type: 'work', extra: true })));
+    const missing = row(0, { type: 'warmup' }); delete missing.completed;
+    await assertFails(setDoc(rowRef(), missing));
+  });
+  it('rejects an invalid typed set atomically without leaving its valid parent behind', async () => {
+    const db = database(FIRST), batch = writeBatch(db);
+    const parentRef = doc(db, 'users', FIRST, 'workouts', 'entry');
+    const setRef = doc(db, 'users', FIRST, 'workoutSets', 'entry_0');
+    batch.set(parentRef, { ...parent(), plannedWorkSets: 3, targetReps: 10 });
+    batch.set(setRef, row(0, { type: 'invalid' }));
+    await assertFails(batch.commit());
+    assert.equal((await assertSucceeds(getDoc(parentRef))).exists(), false);
+    assert.equal((await assertSucceeds(getDoc(setRef))).exists(), false);
+  });
+  it('accepts paired target snapshots with counts independent of actual rows', async () => {
+    await assertSucceeds(setDoc(workoutRef(FIRST, 'minimum'), { ...parent(2), plannedWorkSets: 1, targetReps: 1 }));
+    await assertSucceeds(setDoc(workoutRef(FIRST, 'maximum'), { ...parent(1), plannedWorkSets: 20, targetReps: 100 }));
+    await assertSucceeds(setDoc(workoutRef(), { ...parent(3), plannedWorkSets: 4, targetReps: 10 }));
+    await assertSucceeds(updateDoc(workoutRef(), { setCount: 2, updatedAt: serverTimestamp() }));
+    const saved = (await assertSucceeds(getDoc(workoutRef()))).data();
+    assert.equal(saved.setCount, 2);
+    assert.equal(saved.plannedWorkSets, 4);
+    assert.equal(saved.targetReps, 10);
+  });
+  it('rejects unpaired targets, invalid target bounds and unexpected parent fields', async () => {
+    for (const overrides of [
+      { plannedWorkSets: 3 }, { targetReps: 10 },
+      ...[0, 21, 1.5, '3', null, true].map((plannedWorkSets) => ({ plannedWorkSets, targetReps: 10 })),
+      ...[0, 101, 1.5, '10', null, true].map((targetReps) => ({ plannedWorkSets: 3, targetReps })),
+      { plannedWorkSets: 3, targetReps: 10, extra: true },
+      { type: 'work' },
+    ]) await assertFails(setDoc(workoutRef(), { ...parent(), ...overrides }));
+    await assertSucceeds(setDoc(workoutRef(), { ...parent(), plannedWorkSets: 3, targetReps: 10 }));
+    await assertFails(updateDoc(workoutRef(), { plannedWorkSets: deleteField(), updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(workoutRef(), { targetReps: deleteField(), updatedAt: serverTimestamp() }));
+    await assertFails(setDoc(workoutRef(FIRST, 'legacy-extra'), workout({ plannedWorkSets: 3, targetReps: 10 })));
+  });
+  it('preserves saved snapshots against paired deletion and old-client full replacements', async () => {
+    const ref = workoutRef();
+    await assertSucceeds(setDoc(ref, { ...parent(), plannedWorkSets: 3, targetReps: 10 }));
+    const createdAt = (await assertSucceeds(getDoc(ref))).data().createdAt;
+    await assertFails(updateDoc(ref, { plannedWorkSets: deleteField(), targetReps: deleteField(), updatedAt: serverTimestamp() }));
+    await assertFails(setDoc(ref, { ...parent(), createdAt }));
+    await assertSucceeds(updateDoc(ref, { notes: 'Preserves the saved target', updatedAt: serverTimestamp() }));
+    await assertSucceeds(updateDoc(ref, { plannedWorkSets: 4, targetReps: 8, updatedAt: serverTimestamp() }));
+    const saved = (await assertSucceeds(getDoc(ref))).data();
+    assert.equal(saved.plannedWorkSets, 4);
+    assert.equal(saved.targetReps, 8);
+    const legacyRef = workoutRef(FIRST, 'legacy-parent');
+    await assertSucceeds(setDoc(legacyRef, parent()));
+    const legacyCreatedAt = (await assertSucceeds(getDoc(legacyRef))).data().createdAt;
+    await assertSucceeds(setDoc(legacyRef, { ...parent(), notes: 'Legacy replacement remains valid', createdAt: legacyCreatedAt }));
   });
   it('converts a legacy entry without changing its creation timestamp', async () => {
     const ref = workoutRef();

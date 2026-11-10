@@ -6,6 +6,32 @@ const snapshot = (overrides = {}) => ({ sessionId: 'session-a', planId: 'plan-a'
 const entry = (id, metadata = {}, overrides = {}) => ({ id, date: '2026-11-08', exercise: 'Guggolás', notes: encodeSessionNotes(snapshot(metadata)), createdAt: { seconds: 1 }, ...overrides });
 
 describe('Structured plans', () => {
+  it('defaults new exercises to one warmup and three work sets', () => {
+    const { id, ...item } = newPlanItem();
+    assert.equal(id.length, 8);
+    assert.deepEqual(item, { name: '', sets: 3, reps: 10, warmupSets: 1 });
+    assert.equal(newPlanItem('Custom', 2, 12, 0).warmupSets, 0);
+  });
+
+  it('keeps version one plans additive and roundtrips older counts, values and IDs', () => {
+    const legacyItems = [{ id: 'existing-a', name: 'Squat', sets: 4, reps: 8 }, { id: 'existing-b', name: 'Row', sets: 20, reps: 100 }];
+    const parsed = parsePlan(JSON.stringify({ version: 1, items: legacyItems }));
+    assert.deepEqual(parsed, legacyItems.map((item) => ({ ...item, warmupSets: 0 })));
+    const encoded = encodePlan(legacyItems);
+    assert.equal(JSON.parse(encoded).version, 1);
+    assert.deepEqual(parsePlan(encoded), parsed);
+    assert.deepEqual(legacyItems[0], { id: 'existing-a', name: 'Squat', sets: 4, reps: 8 });
+    assert.ok(parsePlan('Squat 4x8\nRow 3x12').every((item) => item.warmupSets === 0));
+  });
+
+  it('validates separate warmup and work counts within the total row limit', () => {
+    const item = newPlanItem('Squat');
+    assert.equal(parsePlan(encodePlan([{ ...item, sets: 1, warmupSets: 19 }]))[0].warmupSets, 19);
+    for (const change of [{ warmupSets: -1 }, { warmupSets: 20 }, { warmupSets: 0.5 }, { warmupSets: '1' }, { warmupSets: null }, { sets: 20, warmupSets: 1 }, { sets: 0, warmupSets: 1 }]) {
+      assert.throws(() => encodePlan([{ ...item, ...change }]));
+    }
+    assert.equal(parsePlan(encodePlan([{ ...item, sets: 20, warmupSets: 0 }]))[0].sets, 20);
+  });
   it('roundtrips stable IDs, order and Unicode with independent objects', () => {
     const items = [newPlanItem('Guggolás 🏋️', 4, 8), newPlanItem('Evezés', 3, 10)];
     assert.equal(items[0].id.length, 8);

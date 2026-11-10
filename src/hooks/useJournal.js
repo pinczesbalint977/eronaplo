@@ -18,7 +18,7 @@ function hydrate(entry, rows) {
   const setResults = Array.from({ length: entry.setCount }, (_, index) => {
     const row = rows.get(`${entry.id}_${index}`);
     if (!row) incomplete = true;
-    return row ? { weight: row.weight, reps: row.reps, completed: row.completed }
+    return row ? { weight: row.weight, reps: row.reps, completed: row.completed, ...(Object.hasOwn(row, 'type') ? { type: row.type } : {}) }
       : { weight: 0, reps: 1, completed: false };
   });
   return { ...entry, setResults, metadata: { incomplete } };

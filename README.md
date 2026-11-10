@@ -4,6 +4,8 @@ Magyar nyelvű, mobilra tervezett edzésnapló legfeljebb három embernek. React
 
 A GitHub Pages beállításának és a telefonos telepítésnek a lépései a [TELEPITES_TELEFONRA.txt](TELEPITES_TELEFONRA.txt) fájlban vannak. A stílushoz illő lime súlyzóikon Androidra, maskable változatban és iPhone-ra is elkészül; minden build újragenerálja.
 
+Az új bemelegítő/munkasorozat-kezelés, a kizárólag tájékoztató súlyajánlás, a régi adatok megőrzése és a **szabályok → frontend** élesítési sorrend részletes leírása: [BEMELEGITES_ES_SULYAJANLAS.md](BEMELEGITES_ES_SULYAJANLAS.md). Új gyakorlat alapértéke 1 bemelegítő + 3 munkasorozat, 10-es ismétléscél; a régi tervek sorozatszámát nem írjuk át. Az ajánlás a mentett gyakorlatoknál jelenik meg, helyi számítással, extra Firebase-művelet és konkrét kilogrammjavaslat nélkül.
+
 A repository kizárólag forráskódot és telepítési fájlokat tartalmaz. A valódi email-címek, jelszavak, engedélyezett UID-k és edzésadatok a Firebase-ben maradnak. Az alábbi példaértékeket cseréld ki a saját beállításaidra; személyes adatot ne írj a README-be vagy a forráskódba.
 
 ## Edzéstervek és teljes edzések
@@ -212,17 +214,13 @@ Az éles Firebase-konfiguráció és a valódi telefonok beállítása után ell
 6. A telepített Android- és iPhone-app önálló ablakban induljon. Offline újraindítva töltse be az alkalmazás keretét, de ne mutasson korábbi személyes adatot.
 7. Kis mobilon, nagy mobilon, tableten, laptopon, valamint fekvő tájolásban ellenőrizd a beviteli mezőket és a navigációt. A numerikus billentyűzet, az iPhone biztonságos képernyőterületei és a virtuális billentyűzet viselkedése valódi eszközön is próbálandó.
 
-### Elkészült helyi ellenőrzések – 2026. november 8.
+### Elkészült helyi ellenőrzések – 2026. november 10.
 
-- Sikeres éles build, manifest-, ikonméret- és service-worker-ellenőrzés.
-- **28/28 Firestore Security Rules teszt**: saját adatok kezelése, fiókok elkülönítése, illetéktelen hozzáférés és engedélylista-módosítás tiltása, visszavonás, szigorú adatséma, 20 sorozat és egy teljes 10 gyakorlat × 20 sorozatos edzés atomi mentése (210 írás).
-- **6/6 base-path teszt**, továbbá tényleges `/gym-app/#/naplo` böngészős próba Chromium és WebKit alatt, offline újratöltéssel.
-- **16/16 böngészőteszt Chromium és WebKit alatt**: tervkészítés és módosítás, teljes edzés atomi mentése, előző eredmények előtöltése, naptár, korábbi naplók változatlansága, fiókváltás és hozzáférésvédelem, hálózati hibák, a 100 bejegyzéses olvasási korlát és célzott régi előzménykeresés.
-- **7/7 sorozatkezelési egységteszt**: régi adatok kezelése, dátum szerinti előzménykeresés, félkész edzések kihagyása, másolatok változatlansága, azonos napi külön edzések elkülönítése és összehasonlítás.
-- **7/7 írástakarékossági egységteszt**: új sorozatok, változás nélküli mentés, egyetlen módosított sorozat, tényleges törlések és régi adatok átalakítása.
-- **8/8 terv- és edzéscsoport-teszt**: régi tervek, stabil azonosítók, külön napi edzések, hiányos csoportok és változatlan naplópillanatképek.
-- **6/6 atomi mentési teszt**: több gyakorlat közös mentése, stabil új azonosítók, változatlan mentés 0 írással, hibák és az 500 írásos korlát.
-- A bejelentkezés 320, 360, 390, 430, 768, 1024 és 1440 px szélességen, valamint 844 × 390 px fekvő nézetben ellenőrizve. A négy védett nézet mobilos, tabletes, asztali és fekvő méreteken sem okozott vízszintes túlcsordulást. Fekvő mobilon is alsó navigáció jelenik meg.
+- **56/56 unit teszt**: régi tervek és naplók, típusonkénti előtöltés, ajánlási feltételek, célértékek, atomi és írástakarékos mentés, elérési utak.
+- **35/35 Firestore Security Rules teszt**: a három fiók elkülönítése, illetéktelen hozzáférés tiltása, régi és új sorozatformátumok, célértékek, mezők megőrzése és 210 dokumentumos atomi edzésmentés.
+- **18/18 Chromium/WebKit böngészőteszt**: meglévő folyamatok, új 1+3/10 alapértékek, bemelegítés és munka külön előtöltése, mentett ajánlás, elrejtés, egyéni célok pillanatképei, hálózati hibák és hozzáférésvédelem. Újrapróbálás nélkül sikeres.
+- Sikeres éles build és PWA-ellenőrzés: manifest, ikonméretek, service worker és offline előtöltés.
+- Mobilos, tabletes, asztali és fekvő méretek; az új terv- és sorozatfelület 320 px szélességen sem lóg ki.
 
 Ezek helyi builden és szintetikus emulátorfiókokkal végzett ellenőrzések. GitHub Pages-publikálás és fizikai Android/iPhone-telepítési próba nem része ezeknek a helyi automatizált ellenőrzéseknek. Ezeket a fenti útmutató alapján kell elvégezni.
 

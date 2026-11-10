@@ -3,3 +3,31 @@
 .calendar-month{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;font-size:10px;color:var(--muted)}.calendar-month input{min-width:0;max-width:190px;min-height:44px;font-size:12px;padding:8px 10px}
 .calendar-day,.selected-day-heading h2{color:#edeee9}.calendar-day.is-selected{color:#1b2415}
 @media(max-width:400px){.session-calendar{padding:10px}.calendar-grid{gap:0}.calendar-heading{gap:0}.calendar-heading h2{font-size:14px}.calendar-day{min-height:44px}.calendar-heading .icon-button{width:44px}.session-heading{flex-wrap:wrap}.session-heading .entry-actions{margin-left:auto}.plan-editor-row{padding:10px}.plan-defaults{gap:7px}.plan-defaults input{padding:10px}.selected-day-heading h2{font-size:12px}}
+
+.plan-defaults{grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch}
+.plan-defaults label{display:flex;flex-direction:column;justify-content:space-between;gap:8px;overflow-wrap:anywhere;font-size:11px;line-height:1.5}
+.plan-defaults label>span{display:flex;align-items:flex-end;min-height:3em}
+.plan-defaults input{padding:11px 8px}
+.plan-warmup-label>span{color:#d8b17d}
+.plan-work-label>span{color:var(--accent)}
+.plan-row-actions{display:flex;justify-content:flex-end}
+.plan-row-actions .icon-button{width:44px;min-height:44px;margin:0}
+.session-set-group{min-width:0;margin-top:18px;padding:13px 12px;border:1px solid var(--border);border-radius:9px}
+.session-set-group.warmup{border-color:#715b3e;background:#d9a65b06}
+.session-set-group.work{border-color:#506539;background:#c5f46b05}
+.session-set-group-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;min-width:0}
+.session-set-group-heading h4{font-size:12px;font-weight:500}
+.session-set-group-heading .text-button{min-height:44px;white-space:normal;text-align:left}
+.set-kind-badge{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border:1px solid var(--border);border-radius:5px;font-size:10px;line-height:1.4;font-weight:500}
+.set-kind-badge.warmup{color:#e0b580;background:#c3924c12;border-color:#715b3e}
+.set-kind-badge.work{color:var(--accent);background:#c5f46b0c;border-color:#506539}
+.weight-recommendation{display:grid;grid-template-columns:minmax(0,1fr) 44px;align-items:start;gap:5px;width:100%;min-width:0;margin-top:12px;padding:10px 6px 10px 11px;border:1px solid #4c6234;border-radius:8px;background:#c5f46b08}
+.weight-recommendation.maintain{border-color:#56604c;background:#a5b48e06}
+.weight-recommendation-copy{min-width:0;overflow-wrap:anywhere}
+.weight-recommendation-label{display:flex;align-items:center;flex-wrap:wrap;gap:5px;color:var(--accent);font-size:10px;line-height:1.5;font-weight:500}
+.weight-recommendation.maintain .weight-recommendation-label{color:#becbb1}
+.weight-recommendation-label svg{flex-shrink:0}
+.session-card .weight-recommendation p{margin-top:7px;color:#e1e9d7;font-size:11px;line-height:1.65}
+.session-card .weight-recommendation .weight-recommendation-advice{color:var(--muted);font-size:10px}
+.weight-recommendation>.icon-button{width:44px;min-height:44px;margin:-5px 0 0;color:#b2c59d}
+@media(max-width:400px){.plan-defaults label{font-size:10px}.session-set-group{padding:10px 7px}.weight-recommendation{padding-left:9px;gap:1px}}

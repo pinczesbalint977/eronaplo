@@ -32,8 +32,8 @@ async function login(page, index) {
 async function noOverflow(page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 }
-const weight = (page, name, row) => page.getByRole('spinbutton', { name: `${name} ${row}. sorozat súlya`, exact: true });
-const reps = (page, name, row) => page.getByRole('spinbutton', { name: `${name} ${row}. sorozat ismétlése`, exact: true });
+const weight = (page, name, row, type = 'munkasorozat') => page.getByRole('spinbutton', { name: `${name} ${row}. ${type} súlya`, exact: true });
+const reps = (page, name, row, type = 'munkasorozat') => page.getByRole('spinbutton', { name: `${name} ${row}. ${type} ismétlése`, exact: true });
 async function selectDate(page, date) {
   await page.getByLabel('Naptár hónapja', { exact: true }).fill(date.slice(0,7));
   await page.getByRole('button', { name: date, exact: true }).click();
@@ -118,12 +118,14 @@ test.describe.serial('Valódi Auth és Firestore emulátorral', () => {
     await page.getByRole('button', { name: 'Új edzésterv', exact: true }).click();
     await page.getByLabel('Edzésterv neve', { exact: true }).fill(planName);
     await page.getByLabel('Gyakorlat neve', { exact: true }).fill(privateExercise);
-    await page.getByLabel('Sorozatok', { exact: true }).fill('2');
-    await page.getByLabel('Ismétlések', { exact: true }).fill('10');
+    await page.getByLabel('Bemelegítő sorozatok', { exact: true }).fill('0');
+    await page.getByLabel('Munkasorozatok', { exact: true }).fill('2');
+    await page.getByLabel('Ismétléscél', { exact: true }).fill('10');
     await page.getByRole('button', { name: /^Gyakorlat hozzáadása/ }).click();
     await page.getByLabel('Gyakorlat neve', { exact: true }).nth(1).fill(secondExercise);
-    await page.getByLabel('Sorozatok', { exact: true }).nth(1).fill('1');
-    await page.getByLabel('Ismétlések', { exact: true }).nth(1).fill('12');
+    await page.getByLabel('Bemelegítő sorozatok', { exact: true }).nth(1).fill('0');
+    await page.getByLabel('Munkasorozatok', { exact: true }).nth(1).fill('1');
+    await page.getByLabel('Ismétléscél', { exact: true }).nth(1).fill('12');
     await noOverflow(page);
     expect(await page.getByRole('dialog').evaluate((dialog) => dialog.scrollWidth <= dialog.clientWidth)).toBe(true);
     await page.getByRole('button', { name: 'Edzésterv mentése', exact: true }).click();
@@ -175,7 +177,7 @@ test.describe.serial('Valódi Auth és Firestore emulátorral', () => {
     await page.goto(`${appUrl}#/tervek`);
     await page.getByRole('button', { name: `${planName} terv szerkesztése`, exact: true }).click();
     await page.getByLabel('Gyakorlat neve', { exact: true }).first().fill('E2E jövőbeli gyakorlat');
-    await page.getByLabel('Sorozatok', { exact: true }).first().fill('1');
+    await page.getByLabel('Munkasorozatok', { exact: true }).first().fill('1');
     await page.getByRole('button', { name: 'Módosítások mentése', exact: true }).click();
     await page.goto(`${appUrl}#/naplo`);
     await selectDate(page, today);
@@ -235,6 +237,112 @@ test.describe.serial('Valódi Auth és Firestore emulátorral', () => {
     expect(commits.at(-1).writes.every((write) => write.delete)).toBe(true);
     await selectDate(page, '2020-01-06');
     await expect(page.getByText(privateExercise, { exact: true })).toBeVisible();
+  });
+
+  test('bemelegítés, munkasorozatok és mentett cél alapján megjelenő súlyajánlás', async ({ page }) => {
+    test.setTimeout(120000);
+    const name = 'E2E bemelegítés és munkasorozatok';
+    const exercise = 'E2E típusos fekvenyomás';
+    const date = '2021-02-03';
+    const increaseMessage = 'Szép munka! Mindhárom munkasorozatban elérted a 10 ismétlést. A következő edzésen érdemes lehet növelned a súlyt!';
+    const maintainMessage = 'Érdemes lehet megtartanod ezt a súlyt, és az ismétlésszámot az előírt 10 ismétléses célig növelned.';
+    const commits = [];
+    page.on('request', (request) => { if (request.url().endsWith('/documents:commit')) commits.push(request.postDataJSON()); });
+    await page.goto(`${appUrl}#/tervek`);
+    await login(page, 0);
+    await page.setViewportSize({width:320,height:568});
+    await page.getByRole('button', { name: 'Új edzésterv', exact: true }).click();
+    await page.getByLabel('Edzésterv neve', { exact: true }).fill(name);
+    await page.getByLabel('Gyakorlat neve', { exact: true }).fill(exercise);
+    await expect(page.getByLabel('Bemelegítő sorozatok', { exact: true })).toHaveValue('1');
+    await expect(page.getByLabel('Munkasorozatok', { exact: true })).toHaveValue('3');
+    await expect(page.getByLabel('Ismétléscél', { exact: true })).toHaveValue('10');
+    await noOverflow(page);
+    expect(await page.getByRole('dialog').evaluate((dialog) => dialog.scrollWidth <= dialog.clientWidth)).toBe(true);
+    await page.getByRole('button', { name: 'Edzésterv mentése', exact: true }).click();
+    await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
+    await page.goto(`${appUrl}#/naplo`);
+    await openSession(page, name);
+    await page.getByLabel('Edzés dátuma', { exact: true }).fill(date);
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.locator('input[aria-label$="sorozat súlya"]')).toHaveCount(4);
+    await expect(dialog.locator('.weight-recommendation')).toHaveCount(0);
+    await weight(page, exercise, 1, 'bemelegítő sorozat').fill('20');
+    await reps(page, exercise, 1, 'bemelegítő sorozat').fill('1');
+    for (let row = 1; row <= 3; row++) {
+      await weight(page, exercise, row).fill('60');
+      await reps(page, exercise, row).fill('10');
+    }
+    await expect(dialog.locator('.weight-recommendation')).toHaveCount(0);
+    await noOverflow(page);
+    expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    const beforeSave = commits.length;
+    await saveSession(page);
+    expect(commits).toHaveLength(beforeSave + 1);
+    const writes = commits.at(-1).writes;
+    expect(writes).toHaveLength(5);
+    const parent = writes.find((write) => /\/workouts\//.test(write.update?.name));
+    expect(parent.update.fields.plannedWorkSets).toEqual({integerValue:'3'});
+    expect(parent.update.fields.targetReps).toEqual({integerValue:'10'});
+    const rows = writes.filter((write) => /\/workoutSets\//.test(write.update?.name));
+    expect(rows.map((write) => write.update.fields.type.stringValue)).toEqual(['warmup','work','work','work']);
+    await selectDate(page, date);
+    const card = page.locator('.session-card').filter({ has: page.getByRole('heading', { name, exact: true }) });
+    await expect(card.getByText(increaseMessage, { exact: true })).toBeVisible();
+    const beforeDismiss = commits.length;
+    await card.getByRole('button', { name: `${exercise} ajánlás elrejtése`, exact: true }).click();
+    await expect(card.locator('.weight-recommendation')).toHaveCount(0);
+    expect(commits).toHaveLength(beforeDismiss);
+
+    // A new session copies warmup and work independently; the unsaved modal has no advice.
+    const today = await page.evaluate(() => new Date().toLocaleDateString('sv-SE'));
+    await selectDate(page, today);
+    await openSession(page, name);
+    await expect(weight(page, exercise, 1, 'bemelegítő sorozat')).toHaveValue('20');
+    await expect(reps(page, exercise, 1, 'bemelegítő sorozat')).toHaveValue('1');
+    for (let row = 1; row <= 3; row++) {
+      await expect(weight(page, exercise, row)).toHaveValue('60');
+      await expect(reps(page, exercise, row)).toHaveValue('10');
+    }
+    await expect(dialog.locator('.weight-recommendation')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Mégse', exact: true }).click();
+    expect(commits).toHaveLength(beforeDismiss);
+
+    // The saved session keeps its original types and target when the template changes.
+    await page.goto(`${appUrl}#/tervek`);
+    await page.getByRole('button', { name: `${name} terv szerkesztése`, exact: true }).click();
+    await page.getByLabel('Bemelegítő sorozatok', { exact: true }).fill('0');
+    await page.getByLabel('Munkasorozatok', { exact: true }).fill('2');
+    await page.getByLabel('Ismétléscél', { exact: true }).fill('12');
+    await page.getByRole('button', { name: 'Módosítások mentése', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await page.goto(`${appUrl}#/naplo`);
+    await page.reload();
+    await selectDate(page, date);
+    await card.getByRole('button', { name: `${name} edzés szerkesztése`, exact: true }).click();
+    await expect(weight(page, exercise, 1, 'bemelegítő sorozat')).toHaveValue('20');
+    await expect(dialog.locator('input[aria-label$="munkasorozat súlya"]')).toHaveCount(3);
+    await expect(reps(page, exercise, 3)).toHaveValue('10');
+    await reps(page, exercise, 1).fill('9');
+    await saveSession(page);
+    const editedParent = commits.at(-1).writes.find((write) => /\/workouts\//.test(write.update?.name));
+    expect(editedParent.update.fields.plannedWorkSets).toEqual({integerValue:'3'});
+    expect(editedParent.update.fields.targetReps).toEqual({integerValue:'10'});
+    await expect(card.getByText(maintainMessage, { exact: true })).toBeVisible();
+    await expect(card.getByText(increaseMessage, { exact: true })).toHaveCount(0);
+    await noOverflow(page);
+    await card.getByRole('button', { name: `${name} edzés szerkesztése`, exact: true }).click();
+    await weight(page, exercise, 2).fill('65');
+    await saveSession(page);
+    await expect(card.locator('.weight-recommendation')).toHaveCount(0);
+    // Keep the later pagination fixture's exact document budget independent.
+    await card.getByRole('button', { name: `${name} teljes edzés törlése`, exact: true }).click();
+    await page.getByRole('button', { name: 'Végleges törlés', exact: true }).click();
+    await expect(card).toHaveCount(0);
+    await page.goto(`${appUrl}#/tervek`);
+    await page.getByRole('button', { name: `${name} terv törlése`, exact: true }).click();
+    await page.getByRole('button', { name: 'Végleges törlés', exact: true }).click();
+    await expect(page.getByRole('heading', { name, exact: true })).toHaveCount(0);
   });
 
   test('megszakadt teljes edzésmentés után nincs részleges adat vagy hamis sikerjelzés', async ({ page, request }) => {

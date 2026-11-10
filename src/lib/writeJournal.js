@@ -7,6 +7,8 @@ const FIELDS = {
   plans: ['name', 'exercises'],
 };
 const SET_WORKOUT_FIELDS = ['exercise', 'date', 'notes', 'setResults', 'status'];
+const TARGET_FIELDS = ['plannedWorkSets', 'targetReps'];
+const SET_FIELDS = ['weight', 'reps', 'completed'];
 
 function failure(code, message) {
   const error = new Error(message);
@@ -81,11 +83,24 @@ function prepareOperation({ uid, kind, values, id, createId, previous, remove = 
   if (remove) {
     write = { delete: documentName, currentDocument: { exists: true } };
   } else {
-    const expectedFields = kind === 'workouts' && values && Object.hasOwn(values, 'setResults')
-      ? SET_WORKOUT_FIELDS : FIELDS[kind];
+    const perSet = kind === 'workouts' && values && Object.hasOwn(values, 'setResults');
+    const targetFields = perSet && TARGET_FIELDS.some((field) => Object.hasOwn(values, field)) ? TARGET_FIELDS : [];
+    const expectedFields = perSet ? [...SET_WORKOUT_FIELDS, ...targetFields] : FIELDS[kind];
     if (!values || Object.keys(values).length !== expectedFields.length
       || !expectedFields.every((field) => Object.hasOwn(values, field))) {
       throw failure('invalid-argument', 'A mentendő adatok hiányosak. Ellenőrizd az űrlapot.');
+    }
+    if (perSet && (!Array.isArray(values.setResults) || values.setResults.length < 1 || values.setResults.length > 20
+      || values.setResults.some((row) => !row || typeof row !== 'object' || Array.isArray(row)
+        || !SET_FIELDS.every((field) => Object.hasOwn(row, field))
+        || Object.keys(row).some((field) => ![...SET_FIELDS, 'type'].includes(field))
+        || typeof row.weight !== 'number' || !Number.isFinite(row.weight) || row.weight < 0 || row.weight > 1000
+        || !Number.isInteger(row.reps) || row.reps < 1 || row.reps > 100
+        || typeof row.completed !== 'boolean'
+        || (Object.hasOwn(row, 'type') && !['warmup', 'work'].includes(row.type)))
+      || (targetFields.length && (!Number.isInteger(values.plannedWorkSets) || values.plannedWorkSets < 1 || values.plannedWorkSets > 20
+        || !Number.isInteger(values.targetReps) || values.targetReps < 1 || values.targetReps > 100)))) {
+      throw failure('invalid-argument', 'A sorozatok vagy a tervezett cél adatai nem megfelelőek. Ellenőrizd a mezőket.');
     }
     const fields = Object.fromEntries(expectedFields.map((field) => [field, fieldValue(values[field])]));
     if (kind === 'workouts' && Array.isArray(values.setResults)) {
@@ -100,7 +115,7 @@ function prepareOperation({ uid, kind, values, id, createId, previous, remove = 
     // Missing fields in an update mask are deleted, allowing legacy rows to be
     // edited into per-set entries without retaining an invalid mixed schema.
     if (id) write.updateMask = { fieldPaths: kind === 'workouts'
-      ? [...new Set([...FIELDS.workouts, ...SET_WORKOUT_FIELDS, 'setCount'])] : expectedFields };
+      ? [...new Set([...FIELDS.workouts, ...SET_WORKOUT_FIELDS, 'setCount', ...targetFields])] : expectedFields };
     else write.updateTransforms.push({ fieldPath: 'createdAt', setToServerValue: 'REQUEST_TIME' });
   }
 

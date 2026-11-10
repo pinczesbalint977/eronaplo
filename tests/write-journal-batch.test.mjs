@@ -31,6 +31,24 @@ const plan = { name: 'A', exercises: 'Squat' };
 const workout = { exercise: 'Squat', date: '2026-11-08', notes: '', status: 'completed',
   setResults: [{ weight: 60, reps: 10, completed: true }, { weight: 60, reps: 8, completed: true }] };
 
+test('hydration preserves optional set roles and snapshots without adding fields to legacy rows', () => {
+  const hookSource = readFileSync(new URL('../src/hooks/useJournal.js', import.meta.url), 'utf8');
+  const hydrateSource = hookSource.slice(hookSource.indexOf('function hydrate('), hookSource.indexOf('// Firestore adds'));
+  const hydrate = new Function(`${hydrateSource}; return hydrate;`)();
+  const oldRow = { weight: 60, reps: 10, completed: true };
+  const typedRow = { weight: 40, reps: 8, completed: false, type: 'warmup' };
+  const parent = { id: 'entry', setCount: 2, plannedWorkSets: 3, targetReps: 10 };
+  const hydrated = hydrate(parent, new Map([['entry_0', oldRow], ['entry_1', typedRow]]));
+  assert.deepEqual(hydrated.setResults, [oldRow, typedRow]);
+  assert.equal(Object.hasOwn(hydrated.setResults[0], 'type'), false);
+  assert.equal(hydrated.plannedWorkSets, 3);
+  assert.equal(hydrated.targetReps, 10);
+  assert.equal(hydrated.metadata.incomplete, false);
+  const legacy = { id: 'old', weight: 60, reps: 10, sets: 3 };
+  assert.equal(hydrate(legacy, new Map()), legacy);
+  assert.equal(hydrate(parent, new Map()).metadata.incomplete, true);
+});
+
 test('session creates, updates and deletes parents and set rows in one commit', async () => {
   const api = harness();
   const result = await api.writeJournalBatch({ ...api, operations: [
@@ -94,4 +112,90 @@ test('failed atomic commits reject the entire result', async () => {
   const api = harness({ ok: false });
   await assert.rejects(api.writeJournalBatch({ ...api, operations: [{ kind: 'workouts', values: workout }] }), { code: 'permission-denied' });
   assert.equal(api.calls.length, 1);
+});
+
+test('typed sets and independent target snapshots serialize in the same atomic commit without reads', async () => {
+  const api = harness();
+  const typed = { ...workout, plannedWorkSets: 4, targetReps: 10,
+    setResults: workout.setResults.map((row, index) => ({ ...row, type: index ? 'work' : 'warmup' })) };
+  await api.writeJournal({ ...api, kind: 'workouts', values: typed, createId: 'typed' });
+  assert.equal(api.calls.length, 1);
+  assert.equal(api.calls[0].request.method, 'POST');
+  assert.ok(api.calls[0].url.endsWith('/documents:commit'));
+  const { writes } = api.calls[0];
+  assert.equal(writes.length, 3);
+  assert.equal(writes[0].update.fields.setCount.integerValue, '2');
+  assert.equal(writes[0].update.fields.plannedWorkSets.integerValue, '4');
+  assert.equal(writes[0].update.fields.targetReps.integerValue, '10');
+  assert.equal(writes[1].update.fields.type.stringValue, 'warmup');
+  assert.equal(writes[2].update.fields.type.stringValue, 'work');
+});
+
+test('unchanged typed rows and explicit work on legacy rows produce zero writes', async () => {
+  const api = harness();
+  const typed = { ...workout, plannedWorkSets: 2, targetReps: 10,
+    setResults: workout.setResults.map((row) => ({ ...row, type: 'work' })) };
+  await api.writeJournal({ ...api, kind: 'workouts', id: 'typed', values: typed, previous: { ...typed, setCount: 2 } });
+  await api.writeJournal({ ...api, kind: 'workouts', id: 'legacy', values: { ...typed, plannedWorkSets: 2, targetReps: 10 },
+    previous: { ...workout, plannedWorkSets: 2, targetReps: 10, setCount: 2 } });
+  assert.equal(api.tokens(), 0);
+  assert.equal(api.calls.length, 0);
+});
+
+test('role-only edits update one row and the parent; omitted snapshots stay outside the update mask', async () => {
+  const api = harness();
+  const next = { ...workout, setResults: workout.setResults.map((row, index) => index ? row : { ...row, type: 'warmup' }) };
+  await api.writeJournal({ ...api, kind: 'workouts', id: 'entry', values: next,
+    previous: { ...workout, plannedWorkSets: 3, targetReps: 10, setCount: 2 } });
+  const { writes } = api.calls[0];
+  assert.equal(writes.length, 2);
+  assert.ok(writes[1].update.name.endsWith('/workoutSets/entry_0'));
+  assert.equal(writes[1].update.fields.type.stringValue, 'warmup');
+  for (const field of ['plannedWorkSets', 'targetReps']) {
+    assert.equal(writes[0].updateMask.fieldPaths.includes(field), false);
+    assert.equal(Object.hasOwn(writes[0].update.fields, field), false);
+  }
+});
+
+test('snapshot-only edits write the parent and include both provided target fields in its mask', async () => {
+  const api = harness();
+  await api.writeJournal({ ...api, kind: 'workouts', id: 'entry', values: { ...workout, plannedWorkSets: 3, targetReps: 8 },
+    previous: { ...workout, plannedWorkSets: 2, targetReps: 10, setCount: 2 } });
+  const { writes } = api.calls[0];
+  assert.equal(writes.length, 1);
+  assert.ok(writes[0].updateMask.fieldPaths.includes('plannedWorkSets'));
+  assert.ok(writes[0].updateMask.fieldPaths.includes('targetReps'));
+  assert.equal(writes[0].update.fields.plannedWorkSets.integerValue, '3');
+});
+
+test('invalid snapshots, row roles and unknown fields reject before token refresh or network activity', async () => {
+  const invalid = [
+    { ...workout, plannedWorkSets: 3 }, { ...workout, targetReps: 10 },
+    ...[0, 21, 1.5, '3', null].map((plannedWorkSets) => ({ ...workout, plannedWorkSets, targetReps: 10 })),
+    ...[0, 101, 1.5, '10', null].map((targetReps) => ({ ...workout, plannedWorkSets: 3, targetReps })),
+    { ...workout, extra: true },
+    ...['invalid', '', null, 1, true].map((type) => ({ ...workout, setResults: [{ ...workout.setResults[0], type }] })),
+    { ...workout, setResults: [{ ...workout.setResults[0], extra: true }] },
+  ];
+  for (const values of invalid) {
+    const api = harness();
+    await assert.rejects(api.writeJournal({ ...api, kind: 'workouts', values }), { code: 'invalid-argument' });
+    assert.equal(api.tokens(), 0);
+    assert.equal(api.calls.length, 0);
+  }
+});
+
+test('target snapshot bounds are independent of actual rows and legacy parent/row shapes remain unchanged', async () => {
+  const api = harness();
+  await api.writeJournalBatch({ ...api, operations: [
+    { kind: 'workouts', createId: 'minimum', values: { ...workout, plannedWorkSets: 1, targetReps: 1 } },
+    { kind: 'workouts', createId: 'maximum', values: { ...workout, plannedWorkSets: 20, targetReps: 100 } },
+    { kind: 'workouts', createId: 'old', values: workout },
+    { kind: 'workouts', createId: 'numeric', values: { exercise: 'Squat', date: '2026-11-08', notes: '', weight: 40, reps: 10, sets: 3 } },
+  ] });
+  const { writes } = api.calls[0];
+  assert.equal(writes.length, 10);
+  assert.equal(Object.hasOwn(writes[6].update.fields, 'plannedWorkSets'), false);
+  assert.equal(Object.hasOwn(writes[7].update.fields, 'type'), false);
+  assert.equal(writes[9].update.fields.sets.integerValue, '3');
 });

@@ -12,10 +12,58 @@ export const dateLabel = (date, options = { month: 'long', day: 'numeric' }) => 
 // Always return copies: prefilling an editor must never change the source entry.
 export function getSets(entry) {
   if (Array.isArray(entry?.setResults)) {
-    return entry.setResults.map(({ weight, reps, completed }) => ({ weight, reps, completed }));
+    return entry.setResults.map(({ weight, reps, completed, ...rest }) => ({
+      weight, reps, completed, ...(Object.hasOwn(rest, 'type') ? { type: rest.type } : {}),
+    }));
   }
   if (!Number.isInteger(entry?.sets) || entry.sets < 1 || entry.sets > 20) return [];
   return Array.from({ length: entry.sets }, () => ({ weight: entry.weight, reps: entry.reps, completed: true }));
+}
+
+// Rows written before set types existed are working sets.
+export const getSetType = (row) => row?.type === 'warmup' ? 'warmup' : 'work';
+
+export function prefillPlanSets(planItem, previous) {
+  const priorRows = Array.isArray(previous) ? previous : getSets(previous);
+  const groups = {
+    warmup: priorRows.filter((row) => getSetType(row) === 'warmup'),
+    work: priorRows.filter((row) => getSetType(row) === 'work'),
+  };
+  return [['warmup', planItem.warmupSets ?? 0], ['work', planItem.sets]].flatMap(([type, count]) => (
+    Array.from({ length: count }, (_, index) => ({
+      weight: groups[type][index]?.weight ?? '',
+      reps: groups[type][index]?.reps ?? planItem.reps,
+      completed: false,
+      type,
+      touched: false,
+    }))
+  ));
+}
+
+export function getWeightRecommendation(entry) {
+  if (entry?.status !== 'completed' || entry.incomplete || entry.metadata?.incomplete) return null;
+  const { plannedWorkSets, targetReps } = entry;
+  if (!Number.isInteger(plannedWorkSets) || plannedWorkSets < 1 || plannedWorkSets > 20
+    || !Number.isInteger(targetReps) || targetReps < 1 || targetReps > 100) return null;
+  const rows = getSets(entry);
+  if (rows.some((row) => Object.hasOwn(row, 'type') && row.type !== 'warmup' && row.type !== 'work')) return null;
+  const work = rows.filter((row) => getSetType(row) === 'work');
+  if (work.length < plannedWorkSets || work.some((row) => row.completed !== true
+    || !Number.isFinite(row.weight) || row.weight < 0 || row.weight > 1000
+    || !Number.isInteger(row.reps) || row.reps < 1 || row.reps > 100
+    || row.weight !== work[0].weight)) return null;
+  if (work.every((row) => row.reps >= targetReps)) {
+    return {
+      kind: 'increase',
+      message: plannedWorkSets === 3 && targetReps === 10 && work.length === 3
+        ? 'Szép munka! Mindhárom munkasorozatban elérted a 10 ismétlést. A következő edzésen érdemes lehet növelned a súlyt!'
+        : `Szép munka! Minden munkasorozatban elérted az előírt ${targetReps} ismétlést. A következő edzésen érdemes lehet növelned a súlyt!`,
+    };
+  }
+  return {
+    kind: 'maintain',
+    message: `Érdemes lehet megtartanod ezt a súlyt, és az ismétlésszámot az előírt ${targetReps} ismétléses célig növelned.`,
+  };
 }
 
 export const completedSets = (entry) => getSets(entry).filter((set) => set.completed === true);

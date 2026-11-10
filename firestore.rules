@@ -37,13 +37,18 @@ service cloud.firestore {
     }
 
     function validSetWorkout(data) {
-      return data.size() == 7
+      return data.keys().hasAll(['exercise', 'date', 'notes', 'createdAt', 'updatedAt', 'status', 'setCount'])
+        && data.keys().hasOnly(['exercise', 'date', 'notes', 'createdAt', 'updatedAt', 'status', 'setCount', 'plannedWorkSets', 'targetReps'])
         && data.exercise is string && data.exercise.size() >= 1 && data.exercise.size() <= 100
         && data.date is string && data.date.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$')
         && data.notes is string && data.notes.size() <= 1000
         && data.createdAt is timestamp && data.updatedAt is timestamp
         && data.status in ['draft', 'completed']
-        && data.setCount is int && data.setCount >= 1 && data.setCount <= 20;
+        && data.setCount is int && data.setCount >= 1 && data.setCount <= 20
+        && ((!('plannedWorkSets' in data) && !('targetReps' in data))
+          || ('plannedWorkSets' in data && 'targetReps' in data
+            && data.plannedWorkSets is int && data.plannedWorkSets >= 1 && data.plannedWorkSets <= 20
+            && data.targetReps is int && data.targetReps >= 1 && data.targetReps <= 100));
     }
     function validWorkout(data) {
       return 'setCount' in data ? validSetWorkout(data) : validLegacyWorkout(data);
@@ -69,13 +74,20 @@ service cloud.firestore {
         && (resource == null
           ? request.resource.data.createdAt == request.time
           : request.resource.data.createdAt == resource.data.createdAt)
+        // Cached clients must retain target snapshots when replacing a parent.
+        && (resource == null
+          || (!('plannedWorkSets' in resource.data) && !('targetReps' in resource.data))
+          || ('plannedWorkSets' in request.resource.data && 'targetReps' in request.resource.data))
         && validWorkout(request.resource.data);
     }
 
     match /users/{userId}/workoutSets/{setId} {
       allow read, delete: if owns(userId);
       allow create, update: if owns(userId)
-        && request.resource.data.size() == 5
+        // Older clients must update before replacing typed rows; keep saved roles.
+        && (resource == null || !('type' in resource.data) || 'type' in request.resource.data)
+        && request.resource.data.keys().hasAll(['workoutId', 'index', 'weight', 'reps', 'completed'])
+        && request.resource.data.keys().hasOnly(['workoutId', 'index', 'weight', 'reps', 'completed', 'type'])
         && request.resource.data.workoutId is string
         && request.resource.data.workoutId.size() >= 1
         && request.resource.data.workoutId.size() <= 150
@@ -86,7 +98,8 @@ service cloud.firestore {
         && request.resource.data.weight >= 0 && request.resource.data.weight <= 1000
         && request.resource.data.reps is int
         && request.resource.data.reps >= 1 && request.resource.data.reps <= 100
-        && request.resource.data.completed is bool;
+        && request.resource.data.completed is bool
+        && (!('type' in request.resource.data) || request.resource.data.type in ['warmup', 'work']);
     }
 
     match /users/{userId}/plans/{planId} {

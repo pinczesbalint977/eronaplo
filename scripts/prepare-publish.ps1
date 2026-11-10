@@ -3,7 +3,7 @@ $projectRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $publishFiles = @(
     '.gitignore', '.env.example', 'package.json', 'package-lock.json',
     'vite.config.js', 'playwright.config.js', 'index.html', 'firebase.json',
-    'firestore.rules', 'README.md', 'HASZNALATI_UTMUTATO.txt', 'TELEPITES_TELEFONRA.txt'
+    'firestore.rules', 'README.md', 'HASZNALATI_UTMUTATO.txt', 'TELEPITES_TELEFONRA.txt', 'BEMELEGITES_ES_SULYAJANLAS.md'
 )
 foreach ($directory in @('src', 'public', 'scripts', 'tests', '.github')) {
     Get-ChildItem -LiteralPath (Join-Path $projectRoot $directory) -File -Recurse -Force | ForEach-Object {

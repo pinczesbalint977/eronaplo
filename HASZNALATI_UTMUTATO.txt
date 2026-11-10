@@ -1,5 +1,25 @@
 ERŐNAPLÓ – HASZNÁLATI ÚTMUTATÓ
 
+BEMELEGÍTŐ ÉS MUNKASOROZATOK
+
+Új gyakorlat alapértéke 1 bemelegítő és 3 munkasorozat, 10-es ismétléscéllal.
+A tervben külön állíthatod a két sorozatszámot és az ismétléscélt; együtt
+legfeljebb 20 sorozat lehet. A régi tervek meglévő sorozatai munkasorozatok
+maradnak, nem adunk hozzájuk automatikusan új sort. Bemelegítést ezekhez
+a terv szerkesztésével adhatsz. Az edzésnél narancs jelöli a bemelegítést,
+lime a munkasorozatokat; az előző értékek is típusonként illeszkednek.
+
+Mentés után a naptári edzés kártyáján jelenhet meg súlyajánlás. Az összes
+előírt munkasorozatnak teljesülnie kell, azonos súllyal. Ha minden sorozat
+elérte a célismétlést, a súlynövelés megfontolását ajánljuk; különben a súly
+megtartását és az ismétlések növelését. Eltérő munkasúlyoknál nincs ajánlás.
+A bemelegítés kimarad belőle. A korábbi, céladatok nélküli naplókhoz nem
+találunk ki utólag ajánlást. Az ajánlás az X-szel elrejthető, semmit nem
+módosít automatikusan, konkrét kilogrammot vagy növelési mértéket nem ad.
+
+További részletek és a kötelező első szabálypublikálás lépései:
+BEMELEGITES_ES_SULYAJANLAS.md
+
 1. BELÉPÉS
 
 Az előre engedélyezett, legfeljebb három fiók saját email-címmel és jelszóval léphet be.

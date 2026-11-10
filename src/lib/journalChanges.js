@@ -1,4 +1,5 @@
-const sameSet = (a, b) => a?.weight === b?.weight && a?.reps === b?.reps && a?.completed === b?.completed;
+const sameSet = (a, b) => a?.weight === b?.weight && a?.reps === b?.reps && a?.completed === b?.completed
+  && (a?.type ?? 'work') === (b?.type ?? 'work');
 
 // Work entirely from the already loaded private session; no extra read is needed.
 export function journalChanges({ kind, values, previous, id, remove = false }) {
@@ -11,6 +12,7 @@ export function journalChanges({ kind, values, previous, id, remove = false }) {
   const completePrior = previous && Number.isInteger(previous.setCount) && !previous.metadata?.incomplete;
   const changed = rows.flatMap((row, index) => completePrior && sameSet(row, previous.setResults?.[index]) ? [] : [index]);
   const deleted = Array.from({ length: Math.max(0, storedCount - rows.length) }, (_, i) => rows.length + i);
-  const sameParent = previous && ['exercise', 'date', 'notes', 'status'].every((field) => previous[field] === values[field]) && previous.setCount === rows.length;
+  const sameParent = previous && ['exercise', 'date', 'notes', 'status', 'plannedWorkSets', 'targetReps']
+    .every((field) => !Object.hasOwn(values, field) || previous[field] === values[field]) && previous.setCount === rows.length;
   return { changed, deleted, unchanged: Boolean(id && sameParent && !changed.length && !deleted.length) };
 }

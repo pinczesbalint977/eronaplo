@@ -8,8 +8,8 @@ const legacyId = (value, index) => {
   return `legacy-${index}-${(hash >>> 0).toString(36)}`;
 };
 
-export function newPlanItem(name = '', sets = 3, reps = 10) {
-  return { id: crypto.randomUUID().slice(0, 8), name, sets, reps };
+export function newPlanItem(name = '', sets = 3, reps = 10, warmupSets = 1) {
+  return { id: crypto.randomUUID().slice(0, 8), name, sets, reps, warmupSets };
 }
 
 // Parsing never truncates an older plan: the editor can explain any invalid limits.
@@ -22,6 +22,7 @@ export function parsePlan(exercisesString) {
       return parsed.items.map((item, index) => ({
         id: typeof item.id === 'string' && item.id ? item.id : legacyId(JSON.stringify(item), index),
         name: item.name ?? '', sets: item.sets ?? 3, reps: item.reps ?? 10,
+        warmupSets: Object.hasOwn(item, 'warmupSets') ? item.warmupSets : 0,
       }));
     }
   } catch { /* Older plans contain ordinary multiline text. */ }
@@ -32,6 +33,7 @@ export function parsePlan(exercisesString) {
       name: match && match[1].trim() ? match[1].trim() : line,
       sets: match && match[1].trim() ? Number(match[2]) : 3,
       reps: match && match[1].trim() ? Number(match[3]) : 10,
+      warmupSets: 0,
     };
   });
 }
@@ -49,10 +51,12 @@ export function encodePlan(items) {
     if (typeof item.name !== 'string' || !item.name.trim() || item.name.trim().length > 100) {
       throw new Error('A gyakorlat neve 1–100 karakter lehet.');
     }
-    if (!validInteger(item.sets, 1, 20) || !validInteger(item.reps, 1, 100)) {
+    const warmupSets = item.warmupSets === undefined ? 0 : item.warmupSets;
+    if (!validInteger(item.sets, 1, 20) || !validInteger(item.reps, 1, 100)
+      || !validInteger(warmupSets, 0, 19) || item.sets + warmupSets > 20) {
       throw new Error('Gyakorlatonként 1–20 sorozat és 1–100 ismétlés adható meg.');
     }
-    return { id: item.id, name: item.name.trim(), sets: item.sets, reps: item.reps };
+    return { id: item.id, name: item.name.trim(), sets: item.sets, reps: item.reps, warmupSets };
   });
   const result = JSON.stringify({ version: 1, items: normalized });
   if (result.length > 4000) throw new Error('Az edzésterv túl hosszú. Rövidítsd a gyakorlatok nevét.');

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { CalendarDays, ChevronLeft, ChevronRight, Dumbbell, Pencil, Plus, Trash2 } from 'lucide-react';
 import { groupSessions, MAX_PLAN_EXERCISES, workoutNote } from '../lib/sessions';
 import { dateLabel, today, workoutSummary } from '../lib/workouts';
+import WeightRecommendation from './WeightRecommendation';
 import './session-pages.css';
 
 const dateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -21,7 +22,7 @@ export function SessionCard({ session, onEdit, onDelete }) {
     {incomplete && <p className="session-notice" role="status">Az edzés még hiányosan van betöltve. Töltsd be a régebbi edzéseket a szerkesztéshez vagy törléshez.</p>}
     {!incomplete && tooMany && onEdit && <p className="session-notice">Ez a korábbi edzés több mint 10 gyakorlatot tartalmaz, ezért itt nem szerkeszthető.</p>}
     <div className="entry-list">{session.entries.map((entry) => <div className="entry" key={entry.id}>
-      <span className="exercise-icon"><Dumbbell size={19} /></span><div className="entry-info"><h3>{entry.exercise}</h3><p>{workoutSummary(entry)}{entry.status === 'draft' && ' · Folyamatban'}</p>{workoutNote(entry) && <p className="entry-note">{workoutNote(entry)}</p>}</div>
+      <span className="exercise-icon"><Dumbbell size={19} /></span><div className="entry-info"><h3>{entry.exercise}</h3><p>{workoutSummary(entry)}{entry.status === 'draft' && ' · Folyamatban'}</p><WeightRecommendation entry={entry} enabled={!incomplete} />{workoutNote(entry) && <p className="entry-note">{workoutNote(entry)}</p>}</div>
     </div>)}</div>
   </article>;
 }
