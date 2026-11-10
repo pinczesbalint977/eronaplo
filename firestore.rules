@@ -1,0 +1,103 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Admin-managed document; no real UID or account information is committed.
+    // The list must contain exactly two distinct, nonempty UID strings.
+    function allowedUser() {
+      let uids = get(/databases/$(database)/documents/access/allowedUsers).data.uids;
+      return request.auth != null
+        && uids is list
+        && uids.size() == 2
+        && uids[0] is string && uids[0].size() > 0
+        && uids[1] is string && uids[1].size() > 0
+        && uids[0] != uids[1]
+        && request.auth.uid in uids;
+    }
+
+    function owns(userId) {
+      return request.auth != null && request.auth.uid == userId && allowedUser();
+    }
+
+    function validLegacyWorkout(data) {
+      return data.keys().hasAll(['exercise', 'weight', 'reps', 'sets', 'date', 'notes', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['exercise', 'weight', 'reps', 'sets', 'date', 'notes', 'createdAt', 'updatedAt'])
+        && data.exercise is string && data.exercise.size() >= 1 && data.exercise.size() <= 100
+        && data.weight is number && data.weight >= 0 && data.weight <= 1000
+        && data.reps is int && data.reps >= 1 && data.reps <= 100
+        && data.sets is int && data.sets >= 1 && data.sets <= 20
+        && data.date is string
+        && data.date.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$')
+        && data.notes is string && data.notes.size() <= 1000
+        && data.createdAt is timestamp && data.updatedAt is timestamp;
+    }
+
+    function validSetWorkout(data) {
+      return data.size() == 7
+        && data.exercise is string && data.exercise.size() >= 1 && data.exercise.size() <= 100
+        && data.date is string && data.date.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$')
+        && data.notes is string && data.notes.size() <= 1000
+        && data.createdAt is timestamp && data.updatedAt is timestamp
+        && data.status in ['draft', 'completed']
+        && data.setCount is int && data.setCount >= 1 && data.setCount <= 20;
+    }
+    function validWorkout(data) {
+      return 'setCount' in data ? validSetWorkout(data) : validLegacyWorkout(data);
+    }
+
+    function validPlan(data) {
+      return data.keys().hasAll(['name', 'exercises', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['name', 'exercises', 'createdAt', 'updatedAt'])
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 80
+        && data.exercises is string && data.exercises.size() >= 1 && data.exercises.size() <= 4000
+        && data.createdAt is timestamp && data.updatedAt is timestamp;
+    }
+
+    match /users/{userId}/access/check {
+      // A get of this sentinel checks permission even when it does not exist.
+      allow get: if owns(userId);
+    }
+
+    match /users/{userId}/workouts/{workoutId} {
+      allow read, delete: if owns(userId);
+      allow create, update: if owns(userId)
+        && request.resource.data.updatedAt == request.time
+        && (resource == null
+          ? request.resource.data.createdAt == request.time
+          : request.resource.data.createdAt == resource.data.createdAt)
+        && validWorkout(request.resource.data);
+    }
+
+    match /users/{userId}/workoutSets/{setId} {
+      allow read, delete: if owns(userId);
+      allow create, update: if owns(userId)
+        && request.resource.data.size() == 5
+        && request.resource.data.workoutId is string
+        && request.resource.data.workoutId.size() >= 1
+        && request.resource.data.workoutId.size() <= 150
+        && request.resource.data.index is int
+        && request.resource.data.index >= 0 && request.resource.data.index < 20
+        && setId == request.resource.data.workoutId + '_' + string(request.resource.data.index)
+        && request.resource.data.weight is number
+        && request.resource.data.weight >= 0 && request.resource.data.weight <= 1000
+        && request.resource.data.reps is int
+        && request.resource.data.reps >= 1 && request.resource.data.reps <= 100
+        && request.resource.data.completed is bool;
+    }
+
+    match /users/{userId}/plans/{planId} {
+      allow read, delete: if owns(userId);
+      allow create: if owns(userId) && validPlan(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow update: if owns(userId) && validPlan(request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    // Includes /access/allowedUsers, all user root documents, unknown
+    // collections, and any future feature until it receives explicit rules.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

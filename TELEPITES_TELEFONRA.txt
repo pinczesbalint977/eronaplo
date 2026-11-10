@@ -1,0 +1,137 @@
+ERŐNAPLÓ – GITHUB PAGES ÉS TELEFONOS TELEPÍTÉS
+
+Repository: https://github.com/pinczesbalint977/eronaplo
+A sikeres Pages-publikálás utáni alkalmazáscím:
+https://pinczesbalint977.github.io/eronaplo/
+A webcím csak a beállítások és sikeres Actions-publikálás után működik.
+
+FONTOS
+
+A telefonra a végleges, HTTPS-es GitHub Pages címet kell telepíteni.
+A 127.0.0.1:5173 fejlesztői cím a számítógép helyi címe, telefonról nem ez kell.
+A GitHub repository linkje és a működő alkalmazás webcíme különböző.
+Az alkalmazás pontos webcímét a repository Settings -> Pages oldalán találod.
+Példa: https://FELHASZNALONEV.github.io/eronaplo/
+
+1. EGYSZERI GITHUB-BEÁLLÍTÁS
+
+1) A GitHubon hozz létre egy eronaplo nevű public repositoryt. Az ingyenes
+   Pages tárhelyhez a nyilvános forráskód megfelelő; a személyes adatok
+   ettől továbbra is a Firebase-ben, jogosultságvédelemmel maradnak.
+2) A projekt ellenőrzött forrásfájljait töltsd a repository gyökerébe,
+   main ágra. A .github/workflows/deploy.yml fájl is kerüljön fel.
+   Ne másold fel az egész munkamappát ellenőrzés nélkül!
+   A .env.local, node_modules, dist, naplók, tesztképek és személyes adatok
+   nem kerülhetnek fel. A scripts/prepare-publish.ps1 biztonságos, külön
+   felsorolt projektfájlokból készít PUBLISH_READY.zip csomagot.
+   A ZIP-et ki kell bontani: a GitHubnak a forrásfájlok kellenek, nem a ZIP.
+   A rejtett .github és .gitignore fájlokat is vidd át; Git használata ajánlott.
+3) Repository -> Settings -> Secrets and variables -> Actions -> Variables.
+   A New repository variable gombbal vedd fel ezeket:
+
+   VITE_FIREBASE_API_KEY       = Firebase web app apiKey értéke
+   VITE_FIREBASE_AUTH_DOMAIN   = Firebase web app authDomain értéke
+   VITE_FIREBASE_PROJECT_ID    = Firebase web app projectId értéke
+   VITE_FIREBASE_APP_ID        = Firebase web app appId értéke
+
+   Ezeket Firebase Console -> fogaskerék -> Project settings -> General
+   -> Your apps -> a webalkalmazás SDK setup and configuration részében
+   találod. Ezek a kliensoldali webkonfiguráció értékei, nem jelszavak.
+   Felhasználói UID-t, jelszót vagy szolgáltatásfiók-kulcsot NE adj hozzá.
+   A VITE_BASE_PATH változót hagyd üresen: az Actions automatikusan
+   kiszámolja a repositoryhoz tartozó /eronaplo/ elérési utat.
+4) Settings -> Pages -> Build and deployment -> Source: GitHub Actions.
+5) Actions -> Ellenőrzés és GitHub Pages publikálás -> Run workflow -> main.
+   Ez a beállítások után kézzel is indítható. Későbbi main feltöltések
+   automatikusan elindítják az ellenőrzést és publikálást.
+6) Várd meg, amíg az ellenőrzés és a publikálás is zöld. A Settings -> Pages
+   oldalon megjelenő Visit site gomb nyitja meg a kész alkalmazást.
+   Ha az Actions hibás, a piros lépés naplója megmutatja az okot.
+   Hiányzó Firebase-változóknál a publikálás szándékosan megáll.
+
+2. FIREBASE ELLENŐRZÉS – CSAK A KÉT FIÓK
+
+1) Firebase Console -> Authentication -> Settings -> Authorized domains
+   -> Add domain: a GitHub Pages hostneve, például FELHASZNALONEV.github.io.
+   Csak a hostnevet írd be: https://, /eronaplo/ és #/naplo nélkül.
+2) Authentication -> Users: a két saját email/jelszavas fiók maradjon meg.
+   Az alkalmazásban nincs regisztrációs felület.
+3) Firestore -> Data: a már működő access / allowedUsers dokumentumban az
+   uids mező tömbként pontosan a két jó felhasználói UID-t tartalmazza.
+   Az access nevet pontosan írd: nem acces. Az engedélylista adminisztrátori
+   adat; az app nem tudja olvasni vagy módosítani.
+4) Firestore -> Rules: a projekt firestore.rules fájljának megfelelő,
+   már működő szabályok legyenek publikálva. A GitHub Pages feltöltés
+   ezeket nem telepíti. Ne használj allow read, write: if true szabályt.
+   Ha újra bemásolod, a szerkesztő TELJES tartalmát cseréld ki: a rules_version
+   csak egyszer szerepeljen. Utána Publish. A működő szabályokat a Pages
+   domain felvétele miatt önmagában nem kell átírni.
+5) Új privát/inkognitó ablakban az alkalmazás csak bejelentkezést mutasson.
+   A két fiók külön saját adatokat lásson. Kijelentkezés után a napló ne
+   legyen elérhető. Az alkalmazás címének ismerete nem ad adathozzáférést.
+
+A statikus belépési oldal és az ikon nyilvános lehet. Az edzésadatokat a
+szerveroldali Firebase-szabályok védik; másnak nincs jogosultsága használni
+a védett funkciókat. Az engedélyezett domain beállítása önmagában nem
+adatvédelem: a két UID és a Firestore-szabályok is szükségesek.
+
+3. ANDROID – CHROME
+
+1) Nyisd meg a kész HTTPS-es Pages címet közvetlenül a Chrome-ban.
+   Ha üzenetküldőből nyitottad meg, válaszd a Megnyitás Chrome-ban opciót.
+2) Várd meg, amíg az Erőnapló betöltődik. A belépés előtt is telepíthető.
+3) Chrome jobb felső sarok -> három pont (⋮).
+4) Hozzáadás a főképernyőhöz -> Telepítés, vagy Alkalmazás telepítése.
+   A pontos név a Chrome és az Android verziójától függ.
+   Az app alján lévő Hozzáadás a főképernyőhöz útmutatóban a telepítési
+   gombot is használhatod, ha a Chrome felajánlja.
+5) Erősítsd meg a telepítést. Megjelenik az Erőnapló lime súlyzóikonja.
+6) Zárd be a böngészőlapot, és a főképernyőn lévő ikonnal indítsd el.
+   Az app saját ablakban, böngészős címsor nélkül jelenik meg.
+7) Jelentkezz be a SAJÁT email-címeddel és jelszavaddal.
+
+Ha nem látszik a telepítési lehetőség: ellenőrizd, hogy a kész HTTPS-címen
+vagy, normál Chrome-ablakban, az app még nincs-e telepítve, és frissítsd
+a Chrome-ot. A telepítéshez és az első betöltéshez internet kell.
+
+4. IPHONE – SAFARI
+
+1) Nyisd meg a kész HTTPS-es Pages címet a Safari appban, normál lapon.
+   Üzenetküldő beépített böngészője helyett nyisd meg Safariban.
+2) Koppints a Megosztás ikonra (négyzet, felfelé mutató nyíllal).
+   Újabb Safari-elrendezésnél előbb a további lehetőségek menüjét nyisd meg.
+3) Görgess a Hozzáadás a Főképernyőhöz művelethez, és válaszd ki.
+   Ha nem látszik, a műveletek szerkesztésénél engedélyezd.
+4) A név legyen Erőnapló. Ha megjelenik a Megnyitás webappként beállítás,
+   kapcsold BE. Régebbi iOS-en külön ilyen kapcsoló nem feltétlenül van.
+5) Koppints a Hozzáadás gombra.
+6) A főképernyő lime súlyzóikonjáról indítsd el. Az app böngészős címsor
+   nélkül nyílik meg. Ha címsorral indul, a megfelelő kapcsolóval add újra.
+7) Jelentkezz be a SAJÁT fiókoddal. A Safari-lapon történő korábbi belépés
+   nem minden iOS-verzión kerül át a telepített appba; szükség lehet újra rá.
+
+5. NAPI HASZNÁLAT ÉS FRISSÍTÉS
+
+Mindketten a saját telefonotokra telepítsétek, a saját fiókotokkal.
+Edzéstervek -> terv készítése -> Edzés rögzítése -> terv kiválasztása ->
+értékek beírása az előző eredmények mellett -> Edzés mentése.
+Egy mentés az egész edzést a kiválasztott naptári naphoz rögzíti.
+A részletes használatot a HASZNALATI_UTMUTATO.txt fájl tartalmazza.
+
+A mentett belépés megmaradhat újraindítás után; a hozzáférést az app újból
+ellenőrzi. Közös vagy elveszett eszköznél fontos a képernyőzár és kijelentkezés.
+A jelszavakat kizárólag a Firebase Authentication kezeli.
+
+Új verziónál megjelenik az Új verzió érkezett üzenet. Előbb mentsd az edzést,
+majd nyomd meg a Frissítés gombot. Nem kell újratelepíteni az alkalmazást.
+Az ikon változásának megjelenése a telefon gyorsítótárától függhet.
+
+Offline az alkalmazás váza betölthető, de belépéshez, mentéshez és
+szinkronizáláshoz internet kell. A személyes edzésnapló nem kerül tartós
+böngészős adattárba vagy a service worker gyorsítótárába. Kijelentkezéskor
+a munkamenet személyes adatai törlődnek; a felhőben mentett adatok megmaradnak.
+
+Hivatalos útmutatók:
+https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages
+https://support.google.com/chrome/answer/9658361?co=GENIE.Platform%3DAndroid
+https://support.apple.com/hu-hu/guide/iphone/iphea86e5236/ios

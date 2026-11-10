@@ -1,0 +1,144 @@
+ERŐNAPLÓ – HASZNÁLATI ÚTMUTATÓ
+
+1. BELÉPÉS
+
+A két előre engedélyezett fiók saját email-címmel és jelszóval léphet be.
+Mindketten csak a saját terveiket és naplójukat látják. Belépéshez és
+mentéshez internet szükséges. Közös eszközön használat után jelentkezz ki.
+
+2. EDZÉSTERV KÉSZÍTÉSE
+
+Nyisd meg az Edzéstervek oldalt, majd válaszd az Új edzésterv gombot.
+Adj nevet, például Mell nap. Az első gyakorlat neve lehet Fekvenyomás;
+add meg a tervezett sorozatok és ismétlések számát. A Gyakorlat hozzáadása
+gombbal felveheted a többi gyakorlatot. Végül: Edzésterv mentése.
+
+Egy terv 1–10 különböző gyakorlatot tartalmazhat. Gyakorlatonként 1–20
+sorozat és 1–100 ismétlés adható meg. A gyakorlatneveknek azonosnak kell
+maradniuk, hogy a korábbi eredményeket megtaláljuk. Átnevezés új gyakorlatnak
+számít; az eredeti nevű korábbi naplóbejegyzések megmaradnak.
+
+A terv ceruza ikonjával bármikor hozzáadhatsz, törölhetsz vagy lecserélhetsz
+gyakorlatot, és módosíthatod az alapértékeket. Ez a következő edzésekre hat;
+a már elmentett edzéseket és eredményeket nem írja át. A terv törlése sem
+törli a korábbi edzésnaplót.
+
+3. EDZÉS RÖGZÍTÉSE
+
+Nyomd meg az Edzés rögzítése gombot az Áttekintés vagy Edzésnapló oldalon.
+Válaszd ki például a Mell nap tervet, és ellenőrizd az Edzés dátuma mezőt.
+A terv kártyáján az Edzés indítása ugyanezt a tervet előre kiválasztja.
+A gyakorlatokat az app automatikusan betölti: nem kell újra beírni a nevüket.
+
+Minden gyakorlatnál bal oldalon az adott nap előtti legutóbbi befejezett
+edzés dátuma, súlyai és ismétlései látszanak, csak olvashatóan. Nem számít,
+hogy hány nap telt el azóta. Jobb oldalon a mai értékeket szerkesztheted;
+az előző eredmények automatikusan kitöltik a terv sorozatait. Új gyakorlatnál
+a Még nincs korábbi eredmény felirat jelenik meg, a súlyt neked kell megadnod.
+Az ismétlések kezdőértékét a tervedből vesszük. A korábbi edzés további
+sorozatai akkor is láthatók maradnak, ha ma kevesebb sorozatot tervezel.
+
+Írd át a súlyt és az ismétléseket a tényleges eredményekre. Nincs Teljesítve
+jelölőnégyzet. A nem végzett sorozatot a kukával töröld; a Sorozat hozzáadása
+gombbal bővíthetsz. Kilogrammban add meg a súlyt, testsúlyos gyakorlatnál
+a hozzáadott súlyt (pluszsúly nélkül 0).
+
+A fejlődésjelzés módosított vagy már mentett sorozatoknál látszik; az érintetlen
+előtöltés önmagában nem kap eredményjelzést. A zöld nyíl nagyobb súlyt jelez
+legalább azonos ismétléssel, vagy több ismétlést legalább azonos súllyal.
+Gyengébb vagy vegyes eredménynél visszafogott jelzést kapsz.
+
+Az Edzés mentése egy művelettel elmenti az összes gyakorlatot a kiválasztott
+napra. Mentéskor minden megmaradt sorozat elvégzettnek számít: ezért csak
+a tényleg végzett sorozatokat hagyd meg. Várd meg a sikeres visszajelzést.
+Nincs gépelés közbeni vagy félkész automatikus mentés. Bezárás, frissítés
+vagy kijelentkezés előtt ments. Hálózati hibánál az űrlap nyitva marad;
+bizonytalan eredményű kérés után előbb ellenőrizd a naplót.
+
+4. NAPTÁR ÉS MÓDOSÍTÁS
+
+Az Edzésnaplóban válassz napot a naptárban. A jelölt napokon van betöltött
+edzés. A nyilakkal vagy a Naptár hónapja mezővel válthatsz hónapot.
+A Mai nap gomb visszavisz a mai naphoz. A kiválasztott napra az Edzés
+rögzítése gombbal új edzést adhatsz; egy napra több terv is menthető.
+
+Az edzés kártyáján a ceruza a teljes mentett edzést nyitja meg. Itt az
+akkor elvégzett gyakorlatokat és sorozatokat módosítod, még akkor is, ha
+az edzéstervedet azóta lecserélted. A kukával a teljes edzés törölhető;
+a Végleges törlés megerősítés után nem vonható vissza. A Mégse nem ment.
+A korábbi rendszerben rögzített gyakorlatok naponta Korábbi edzés néven
+csoportosítva jelennek meg. Hiányosan betöltött edzés előtt tölts be további
+előzményeket; így nem szerkesztesz vagy törölsz véletlenül csak egy részt.
+
+5. FEJLŐDÉS ÉS RÉGEBBI ADATOK
+
+Az Áttekintés havi és heti aktivitást mutat. A Fejlődés oldalon a betöltött
+napokból számolt összterhelést, sorozatokat és egyéni legjobbakat találod.
+Összterhelés = súly × ismétlés, a sorozatokon összeadva. A grafikon egy
+gyakorlat utolsó nyolc betöltött edzésnapjának legnagyobb súlyát mutatja.
+
+Induláskor a legutóbbi 100 gyakorlatbejegyzés és a hozzájuk tartozó sorozatok
+töltődnek be, nem a teljes többéves napló. A Régebbi edzések betöltése gomb
+100-as oldalanként tölti be a korábbiakat. A statisztikák és a naptár csak
+a betöltött részt mutatják; erre külön figyelmeztetés is megjelenik.
+
+Edzésrögzítésnél a terv kiválasztása és a dátum változtatása automatikusan
+megkeresi a régebbi előző eredményt is. A közös előzményoldalak és a találatok
+egy munkameneten belül memóriában maradnak. Gépelés nem indít új keresést.
+Régi, ritkán végzett gyakorlat keresése plusz olvasásokat igényelhet.
+
+6. TELEPÍTÉS ÉS INTERNET
+
+Androidon Chrome menü: Alkalmazás telepítése vagy Hozzáadás a főképernyőhöz.
+iPhone-on Safari: Megosztás -> Főképernyőhöz adás. Ezután az ikonnal indítsd.
+Az app mobilon, tableten és számítógépen is használható, álló és fekvő nézetben.
+
+Az offline gyorsítótár az alkalmazás felületét tárolja. A személyes napló
+nem kap tartós helyi gyorsítótárat. A megnyitott munkamenetben a már letöltött
+adatok memóriában lehetnek, de belépéshez, mentéshez, törléshez és további
+adatokhoz internet kell. A program csak szerver által visszaigazolt mentést
+jelez sikeresnek. Kijelentkezés törli a személyes munkamenetet, a felhőben
+mentett eredmények megmaradnak. Új appverziónál előbb ments, aztán frissíts.
+
+7. FIREBASE-TAKARÉKOSSÁG
+
+Edzésenként egyszer ments, és kerüld a szükségtelen oldalfrissítést vagy
+régi betöltést. A teljes edzés egy atomi kérés, de minden benne változó
+dokumentum külön írásnak számít a Firebase-nél. Változatlan mentés 0 írás;
+egy sorozat módosítása tipikusan 2. Nincs automatikus írás gépeléskor.
+Maradjatok Spark csomagban, és időnként nézzétek meg Firestore -> Usage.
+
+BECSÜLT INGYENES HASZNÁLAT (2026. NOVEMBER 8.)
+
+Feltételezés: két fő, fejenként heti négy edzés, alkalmanként hat gyakorlat,
+gyakorlatonként négy sorozat; egy közös mentés teljes edzésenként.
+Új, hatgyakorlatos edzés: 30 dokumentumírás; egy négy sorozatos gyakorlat: 5; egy sorozat módosítása: 2 írás;
+változatlan bejegyzés ismételt mentése: 0 írás. Gépelés közben nincs írás.
+Ha mindketten edzetek aznap, az alapforgalom kb. 60 írás/nap.
+
+Fejenként napi öt teljes újranyitással az induló adatolvasás kb. 5000/nap,
+szokásos frissítésekkel és jogosultságellenőrzéssel kb. 6000-8000/nap.
+Ez becslés: a régi előzmények keresése, kézi betöltése, sok megnyitott fül
+és az újracsatlakozások további olvasásokat okozhatnak.
+
+Jelenlegi Firestore-keret: napi 50 000 olvasás, 20 000 írás, 20 000 törlés,
+1 GiB tárolás, havi 10 GiB kimenő adatforgalom. A napi keretek megújulnak;
+az ingyenes csomagnak nincs meghatározott lejárati ideje.
+
+Ezzel a használattal évente kb. 12 480 új dokumentum keletkezik.
+Ha indexekkel együtt átlagosan 2-5 KiB/dokumentummal számolunk,
+az évi 24-61 MiB, tíz év alatt kb. 0,24-0,60 GiB. A tisztán tárolásból
+számolt határ kb. 17-42 év; ez nem garancia vagy tényleges méretmérés.
+A valós méret, indexek, megjegyzések, régi adatok olvasása és a szolgáltató
+későbbi feltételei is számítanak. Tíz vagy több év használata reális cél.
+
+Maradjatok Spark csomagban, és a Firestore -> Usage felületen időnként
+nézzétek meg a fogyasztást. További lehetőség az egy munkamenetben történő
+használat, a szükségtelen régi betöltések kerülése, illetve később a nem
+használt mezők indexelésének kikapcsolása és saját másolat után archiválás.
+Későbbi fejlesztési lehetőség a havi összesítő dokumentumok tárolása:
+ezekkel a teljes történet statisztikái is kevesebb olvasásból előállíthatók.
+Az app személyes adatai továbbra sem kerülnek a GitHubra.
+
+Hivatalos keretek: https://firebase.google.com/docs/firestore/quotas
+Olvasások elszámolása: https://firebase.google.com/docs/firestore/pricing
