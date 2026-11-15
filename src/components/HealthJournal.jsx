@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Download, RefreshCw, Scale, Utensils } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Download, RefreshCw, Scale, Utensils } from 'lucide-react';
 import { dateLabel, number, today } from '../lib/workouts';
 import { healthWeekSummary, validateBody, validateNutrition, weekDates, weekSunday } from '../lib/health';
 import './health-journal.css';
@@ -10,6 +10,12 @@ const nutritionFields = [ ['calories', 'Kalória', 'kcal', 20000], ['protein', '
 const bodyFields = [ ['weight', 'Testsúly', 'kg', 20, 500], ['waist', 'Derékbőség', 'cm', 20, 300], ['neck', 'Nyakkörfogat', 'cm', 10, 100] ];
 const same = (first, second) => Object.keys(second).every((key) => String(first?.[key] ?? '') === String(second[key]));
 const formValues = (record, defaults) => Object.fromEntries(Object.keys(defaults).map((key) => [key, record?.[key] ?? '']));
+
+function SaveFeedback({ active, notice, error, feedbackRef }) {
+  if (!active || (!notice && !error)) return null;
+  const Icon = error ? AlertCircle : CheckCircle2;
+  return <p ref={feedbackRef} role={error ? 'alert' : 'status'} className={`health-save-feedback ${error ? 'is-error' : 'is-success'}`}><Icon size={19} aria-hidden="true" /><span>{error || notice}</span></p>;
+}
 
 function shiftWeek(sunday, weeks) {
   const date = new Date(sunday + 'T12:00:00');
@@ -29,6 +35,8 @@ export default function HealthJournal({ journal }) {
   const [pending, setPending] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [feedbackFor, setFeedbackFor] = useState('');
+  const feedbackRef = useRef(null);
   const request = useRef(0);
   const alive = useRef(true);
   const previousDay = records?.days.find((entry) => entry.date === date);
@@ -40,7 +48,7 @@ export default function HealthJournal({ journal }) {
 
   async function load(refresh = false) {
     const revision = ++request.current;
-    setLoading(true); setError(''); setNotice('');
+    setLoading(true); setError(''); setNotice(''); setFeedbackFor('');
     try {
       const value = await journal.loadWeek(sunday, { refresh });
       if (!alive.current || revision !== request.current) return;
@@ -61,6 +69,9 @@ export default function HealthJournal({ journal }) {
   }, [sunday, journal.loadWeek]);
   useEffect(() => { setDayForm(formValues(previousDay, blankDay)); }, [date, previousDay]);
   useEffect(() => {
+    if (feedbackFor && (notice || error)) feedbackRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [feedbackFor, notice, error]);
+  useEffect(() => {
     if (!dirty) return;
     const warn = (event) => { event.preventDefault(); event.returnValue = ''; };
     window.addEventListener('beforeunload', warn);
@@ -73,7 +84,7 @@ export default function HealthJournal({ journal }) {
   }
   function changeDate(next) {
     if (!same(previousDay, dayForm) && !window.confirm('Másik napot választasz? A napi, nem mentett értékek elvesznek.')) return;
-    setDate(next); setError(''); setNotice('');
+    setDate(next); setError(''); setNotice(''); setFeedbackFor('');
   }
   function selectWeek(value) {
     if (!value) return;
@@ -82,12 +93,21 @@ export default function HealthJournal({ journal }) {
       if (next < '2000-01-09' || next > weekSunday(current)) throw new Error('Invalid week');
       changeWeek(next);
     }
-    catch { setError('Érvényes, 2000 utáni dátumot válassz.'); }
+    catch { setFeedbackFor(''); setError('Érvényes, 2000 utáni dátumot válassz.'); }
+  }
+  function edit(kind, key, value) {
+    if (kind === 'day') setDayForm((old) => ({ ...old, [key]: value }));
+    else setBodyForm((old) => ({ ...old, [key]: value }));
+    if (feedbackFor === kind) { setNotice(''); setError(''); }
+  }
+  function invalid(kind) {
+    setFeedbackFor(kind); setNotice('');
+    setError('Ellenőrizd a kitöltött mezőket és a megengedett értékeket.');
   }
   async function save(event, kind) {
     event.preventDefault();
     if (busy || !records) return;
-    setError(''); setNotice('');
+    setError(''); setNotice(''); setFeedbackFor(kind);
     try {
       const values = kind === 'day' ? validateNutrition({ date, ...dayForm }) : validateBody({ date: sunday, ...bodyForm });
       if (values.date > current) throw new Error('Jövőbeli napra még nem menthetsz adatot.');
@@ -109,7 +129,7 @@ export default function HealthJournal({ journal }) {
   }
   async function exportWeek() {
     if (busy || !records) return;
-    setPending('pdf'); setError(''); setNotice('');
+    setPending('pdf'); setError(''); setNotice(''); setFeedbackFor('');
     try {
       const { generateHealthPdf } = await import('../lib/healthPdf');
       const blob = await generateHealthPdf({ sunday, days: records.days, body: records.body });
@@ -136,23 +156,25 @@ export default function HealthJournal({ journal }) {
       <button className="text-button" disabled={busy} onClick={() => { if (!dirty || window.confirm('Újratöltöd a mentett adatokat? A nem mentett értékek elvesznek.')) void load(true); }}><RefreshCw size={15} />Adatok frissítése</button>
     </div>
     {loading && <p role="status" className="health-feedback">Heti napló betöltése…</p>}
-    {error && <p className="form-error health-feedback" role="alert">{error}</p>}
-    {notice && <p className="health-feedback" role="status">{notice}</p>}
+    {error && !feedbackFor && <p className="form-error health-feedback" role="alert">{error}</p>}
+    {notice && !feedbackFor && <p className="health-feedback" role="status">{notice}</p>}
     {!loading && records && <>
       <div className="health-grid">
         <section className="card health-panel" aria-label="Napi bevitel"><div className="health-panel-heading"><Utensils size={21} /><div><span className="small-label">YAZIO ALAPJÁN</span><h2>Napi bevitel</h2></div></div>
           <p className="muted small">Másold át a napi összesítést. Itt csak naplózunk, nincs kalória- vagy tápanyagszámítás.</p>
-          <form className="edit-form" onSubmit={(event) => save(event, 'day')}>
+          <form className="edit-form" onSubmit={(event) => save(event, 'day')} onInvalidCapture={() => invalid('day')}>
             <label>Nap<select aria-label="Napi bevitel dátuma" value={date} disabled={Boolean(pending)} onChange={(event) => changeDate(event.target.value)}>{dates.map((day) => <option key={day} value={day} disabled={day > current}>{dateLabel(day, { weekday: 'long', month: 'short', day: 'numeric' })}</option>)}</select></label>
-            <div className="health-input-grid">{nutritionFields.map(([key, label, unit, max]) => <label key={key}>{label} ({unit})<input type="number" inputMode="decimal" step="0.1" min="0" max={max} required disabled={Boolean(pending)} value={dayForm[key]} onChange={(event) => setDayForm((old) => ({ ...old, [key]: event.target.value }))} /></label>)}</div>
+            <div className="health-input-grid">{nutritionFields.map(([key, label, unit, max]) => <label key={key}>{label} ({unit})<input type="number" inputMode="decimal" step="any" min="0" max={max} required disabled={Boolean(pending)} value={dayForm[key]} onChange={(event) => edit('day', key, event.target.value)} /></label>)}</div>
+            <SaveFeedback active={feedbackFor === 'day'} notice={notice} error={error} feedbackRef={feedbackRef} />
             <button type="submit" className="button button-primary" disabled={Boolean(pending) || date > current}>{pending === 'day' ? 'Mentés…' : 'Napi bevitel mentése'}</button>
           </form>
         </section>
         <section className="card health-panel" aria-label="Vasárnapi mérés"><div className="health-panel-heading"><Scale size={22} /><div><span className="small-label">HETENTE EGYSZER</span><h2>Vasárnapi mérés</h2></div></div>
           <p className="muted small">{dateLabel(sunday, { year: 'numeric', month: 'long', day: 'numeric' })}. A derék és a nyak mérőszalaggal mért körfogata, cm-ben.</p>
-          <form className="edit-form" onSubmit={(event) => save(event, 'body')}>
-            {bodyFields.map(([key, label, unit, min, max]) => <label key={key}>{label} ({unit})<input type="number" inputMode="decimal" step="0.1" min={min} max={max} required disabled={Boolean(pending) || !canMeasure} value={bodyForm[key]} onChange={(event) => setBodyForm((old) => ({ ...old, [key]: event.target.value }))} /></label>)}
+          <form className="edit-form" onSubmit={(event) => save(event, 'body')} onInvalidCapture={() => invalid('body')}>
+            {bodyFields.map(([key, label, unit, min, max]) => <label key={key}>{label} ({unit})<input type="number" inputMode="decimal" step="any" min={min} max={max} required disabled={Boolean(pending) || !canMeasure} value={bodyForm[key]} onChange={(event) => edit('body', key, event.target.value)} /></label>)}
             {!canMeasure && <p className="muted small">A heti mérést vasárnaptól tudod rögzíteni. Korábbi hetet bármikor kitölthetsz.</p>}
+            <SaveFeedback active={feedbackFor === 'body'} notice={notice} error={error} feedbackRef={feedbackRef} />
             <button type="submit" className="button button-primary" disabled={Boolean(pending) || !canMeasure}>{pending === 'body' ? 'Mentés…' : 'Heti mérés mentése'}</button>
           </form>
         </section>

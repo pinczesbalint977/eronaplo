@@ -18,6 +18,8 @@ TEST ÉS ÉTREND – ÚJ NAPLÓ
 4. Vasárnap a Vasárnapi mérés mezőibe írd a testsúlyt kg-ban, a derékbőséget
    és a nyakkörfogatot cm-ben, majd Heti mérés mentése. Körfogatot mérj,
    ne átmérőt. Korábbi hetek vasárnapi adatait később is kitöltheted.
+   A mentőgombnál zöld visszajelzés jelzi a sikeres mentést, piros a hibát.
+   Új érték beírásakor a korábbi sikerjelzés eltűnik; a módosítást újra mentsd.
 5. A Heti PDF letöltése a kiválasztott hét mentett adatait exportálja.
    Előbb mentsd a módosításaidat! Hiányzó napot nem számol nullának.
 6. Androidon keresd a PDF-et a Letöltésekben. iPhone-on a megnyitott vagy

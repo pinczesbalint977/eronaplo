@@ -175,15 +175,33 @@ test.describe.serial('Valódi Auth és Firestore emulátorral', () => {
     await expect(page.getByRole('button', { name: 'Napi bevitel mentése', exact: true })).toBeEnabled();
     expect(commits).toHaveLength(beforeSave + 1);
     // Saving body measurements must preserve a not-yet-saved daily edit.
+    await page.setViewportSize({ width: 390, height: 844 });
+    const bodyPanel = page.getByRole('region', { name: 'Vasárnapi mérés', exact: true });
     await page.getByLabel('Kalória (kcal)', { exact: true }).fill('2400');
-    for (const [label, value] of [['Testsúly (kg)', '85.5'], ['Derékbőség (cm)', '90'], ['Nyakkörfogat (cm)', '38.5']]) {
+    for (const [label, value] of [['Testsúly (kg)', '85.25'], ['Derékbőség (cm)', '90'], ['Nyakkörfogat (cm)', '38.5']]) {
       await page.getByLabel(label, { exact: true }).fill(value);
     }
     await page.getByRole('button', { name: 'Heti mérés mentése', exact: true }).click();
-    await expect(page.getByRole('status')).toContainText('A heti mérés elmentve.');
+    await expect(bodyPanel.getByRole('status')).toContainText('A heti mérés elmentve.');
+    await expect(bodyPanel.getByRole('status')).toBeInViewport({ ratio: 1 });
     await expect(page.getByLabel('Kalória (kcal)', { exact: true })).toHaveValue('2400');
     expect(commits).toHaveLength(beforeSave + 2);
     expect(commits.at(-1).writes).toHaveLength(1);
+    await bodyPanel.getByLabel('Testsúly (kg)', { exact: true }).fill('86.25');
+    await expect(bodyPanel.getByRole('status')).toHaveCount(0);
+    await page.route('**/documents:commit', (route) => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { status: 'UNAVAILABLE' } }) }), { times: 1 });
+    await bodyPanel.getByRole('button', { name: 'Heti mérés mentése', exact: true }).click();
+    await expect(bodyPanel.getByRole('alert')).toContainText('Nem érkezett visszaigazolás');
+    await expect(bodyPanel.getByRole('alert')).toBeInViewport({ ratio: 1 });
+    await expect(bodyPanel.getByRole('status')).toHaveCount(0);
+    await expect(bodyPanel.getByLabel('Testsúly (kg)', { exact: true })).toHaveValue('86.25');
+    const beforeInvalid = commits.length;
+    await bodyPanel.getByLabel('Derékbőség (cm)', { exact: true }).fill('');
+    await bodyPanel.getByRole('button', { name: 'Heti mérés mentése', exact: true }).click();
+    await expect(bodyPanel.getByRole('alert')).toContainText('Ellenőrizd a kitöltött mezőket');
+    expect(commits).toHaveLength(beforeInvalid);
+    await bodyPanel.getByLabel('Derékbőség (cm)', { exact: true }).fill('90');
+    await bodyPanel.getByLabel('Testsúly (kg)', { exact: true }).fill('85.25');
     await page.getByRole('button', { name: 'Napi bevitel mentése', exact: true }).click();
     await expect(page.getByRole('status')).toContainText('A napi bevitel elmentve.');
     const download = page.waitForEvent('download');
