@@ -46,6 +46,11 @@ Válaszd ki például a Mell nap tervet, és ellenőrizd az Edzés dátuma mező
 A terv kártyáján az Edzés indítása ugyanezt a tervet előre kiválasztja.
 A gyakorlatokat az app automatikusan betölti: nem kell újra beírni a nevüket.
 
+Ha edzés közben visszalépnél, a Mégse vagy a bezárás gombot nyomnád meg,
+az app megerősítést kér. Elutasításkor a beírt értékek megmaradnak.
+Sikeres mentés után nincs külön megerősítés. Oldalfrissítésnél a böngésző
+saját figyelmeztetést mutathat. Ez nem automatikus piszkozatmentés.
+
 Minden gyakorlatnál bal oldalon az adott nap előtti legutóbbi befejezett
 edzés dátuma, súlyai és ismétlései látszanak, csak olvashatóan. Nem számít,
 hogy hány nap telt el azóta. Jobb oldalon a mai értékeket szerkesztheted;

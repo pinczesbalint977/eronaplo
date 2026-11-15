@@ -47,6 +47,16 @@ async function saveSession(page) {
   await page.getByRole('button', { name: /^(Edzés mentése|Módosítások mentése)$/ }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 }
+async function discardSession(page) {
+  const confirmation = page.waitForEvent('dialog');
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Mégse', exact: true }).click();
+  const dialog = await confirmation;
+  expect(dialog.type()).toBe('confirm');
+  expect(dialog.message()).toBe('Biztosan vissza szeretnél lépni? A nem mentett edzésadatok elvesznek.');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.waitForFunction(() => !history.state?.eronaploWorkoutGuard);
+}
 
 test('a nyilvános felület minden méreten csak bejelentkezést mutat', async ({ page }) => {
   for (const [width, height] of [[320,568],[360,640],[390,844],[430,932],[768,1024],[1024,768],[1440,900],[844,390]]) {
@@ -221,7 +231,7 @@ test.describe.serial('Valódi Auth és Firestore emulátorral', () => {
     await selectDate(page, today);
     await page.getByRole('button', { name: `${planName} edzés szerkesztése`, exact: true }).click();
     await expect(weight(page, privateExercise, 1)).toHaveValue('67.5');
-    await page.getByRole('button', { name: 'Mégse', exact: true }).click();
+    await discardSession(page);
     for (const [width,height] of [[320,568],[390,844],[768,1024],[1024,768],[1440,900],[844,390]]) {
       await page.setViewportSize({width,height});
       for (const route of ['', 'naplo','tervek','statisztika']) {
@@ -352,7 +362,7 @@ test.describe.serial('Valódi Auth és Firestore emulátorral', () => {
     await expect(weight(page, exercise, 1)).toHaveValue('80');
     for (let row = 2; row <= 4; row++) await expect(weight(page, exercise, row)).toHaveValue('140');
     expect(commits).toHaveLength(beforeDismiss);
-    await page.getByRole('button', { name: 'Mégse', exact: true }).click();
+    await discardSession(page);
     expect(commits).toHaveLength(beforeDismiss);
 
     // The saved session keeps its original types and target when the template changes.
@@ -382,7 +392,7 @@ test.describe.serial('Valódi Auth és Firestore emulátorral', () => {
     await expect(dialog.locator('.weight-recommendation')).toContainText('12 ismétlés');
     await expect(dialog.getByText(increaseMessage)).toHaveCount(0);
     await noOverflow(page);
-    await page.getByRole('button', { name: 'Mégse', exact: true }).click();
+    await discardSession(page);
     await selectDate(page, date);
     await card.getByRole('button', { name: `${name} edzés szerkesztése`, exact: true }).click();
     await weight(page, exercise, 3).fill('145');
@@ -392,7 +402,7 @@ test.describe.serial('Valódi Auth és Firestore emulátorral', () => {
     await openSession(page, name);
     await expect(dialog.locator('.series-history')).toContainText('2021. február 3.');
     await expect(dialog.getByText(increaseMessage)).toHaveCount(0);
-    await page.getByRole('button', { name: 'Mégse', exact: true }).click();
+    await discardSession(page);
     // Keep the later pagination fixture's exact document budget independent.
     await selectDate(page, date);
     await card.getByRole('button', { name: `${name} teljes edzés törlése`, exact: true }).click();
@@ -421,7 +431,7 @@ test.describe.serial('Valódi Auth és Firestore emulátorral', () => {
     await page.getByRole('button', { name: 'Edzés mentése', exact: true }).click();
     await expect(page.getByRole('alert')).toContainText('Ellenőrizd a naplót');
     await expect(page.getByRole('button', { name: 'Edzés mentése', exact: true })).toBeEnabled();
-    await page.getByRole('button', { name: 'Mégse', exact: true }).click();
+    await discardSession(page);
     expect(await storedWorkouts()).toEqual(before);
     await page.unroute('**/documents:commit');
   });
@@ -488,7 +498,7 @@ test.describe.serial('Valódi Auth és Firestore emulátorral', () => {
     await expect(weight(page, oldExercise, 1)).toHaveValue('55');
     await expect(weight(page, oldExercise, 4)).toHaveValue('85');
     expect(await cachedSets()).toBeLessThanOrEqual(104);
-    await page.getByRole('button', { name: 'Mégse', exact: true }).click();
+    await discardSession(page);
     await page.getByRole('button', { name: 'Régebbi edzések betöltése', exact: true }).click();
     await selectDate(page, '2020-01-01');
     await expect(page.getByText(oldExercise, { exact: true })).toBeVisible();

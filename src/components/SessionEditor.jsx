@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp, Check, Minus, Plus, Trash2 } from 'lucide-react';
 import { compareSet, dateLabel, getSets, getPlannedWorkSets, getPositionedSets, number, prefillPlanSets, previousWorkout, today } from '../lib/workouts';
 import { encodePlan, encodeSessionNotes, MAX_PLAN_EXERCISES, parsePlan, workoutNote } from '../lib/sessions';
 import WeightRecommendation from './WeightRecommendation';
+import useWorkoutLeaveGuard from '../hooks/useWorkoutLeaveGuard';
 
 const validatedSets = (rows) => rows.map((row, index) => {
   const weight = Number(row.weight), reps = Number(row.reps);
@@ -32,6 +33,7 @@ export default function SessionEditor({ journal, item, initialDate, initialPlanI
   const revision = useRef(0);
   const plan = journal.plans.find((entry) => entry.id === planId);
   const planName = item?.planName || plan?.name || '';
+  const { requestClose, saved } = useWorkoutLeaveGuard({ enabled: exercises.length > 0, pending, close });
 
   // Template changes are snapshots for future workouts; existing sessions keep their exercises.
   useEffect(() => {
@@ -128,10 +130,11 @@ export default function SessionEditor({ journal, item, initialDate, initialPlanI
       }));
       setPending(true);
       await journal.saveSession(entries);
+      saved();
       done(item ? 'Az edzés módosításait mentettük.' : 'Edzés elmentve a naptárba. Szép munka!');
     } catch (reason) { setError(reason.message || 'Az edzés mentése nem sikerült.'); setPending(false); }
   }
-  return <Modal title={item ? 'Edzés szerkesztése' : 'Edzés rögzítése'} close={() => !pending && close()} wide>
+  return <Modal title={item ? 'Edzés szerkesztése' : 'Edzés rögzítése'} close={requestClose} wide>
     <form className="edit-form session-editor" onSubmit={submit}>
       {item ? <div className="session-plan-name"><span className="small-label">EDZÉSTERV</span><h3>{planName}</h3><p className="muted small">A mentett edzés gyakorlatai; a terv későbbi módosításai ezt nem írják át.</p></div>
         : <label>Edzésterv<select aria-label="Edzésterv" autoFocus value={planId} required disabled={pending} onChange={(event) => setPlanId(event.target.value)}><option value="">Válassz edzéstervet…</option>{journal.plans.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select></label>}
@@ -162,7 +165,7 @@ export default function SessionEditor({ journal, item, initialDate, initialPlanI
       </section>)}
       {exercises.length > 0 && <><p className="field-help series-help">Az első sorozat mindig bemelegítő, a többi munkasorozat. Az ajánlás az előző befejezett edzés alapján jelenik meg; a mai mezőket nem változtatja meg. Mentéskor a megmaradt sorozatokat elvégzettként rögzítjük, a ki nem végzetteket töröld.</p><label>Megjegyzés (opcionális)<textarea value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={300} rows={2} disabled={pending || item?.legacy} /></label></>}
       {error && <p className="form-error" role="alert">{error}</p>}
-      <div className="modal-actions"><button type="button" className="button button-secondary" disabled={pending} onClick={close}>Mégse</button><button type="submit" className="button button-primary" disabled={pending || historyLoading || !exercises.length}>{pending ? 'Mentés…' : item ? 'Módosítások mentése' : 'Edzés mentése'}<Check size={18} /></button></div>
+      <div className="modal-actions"><button type="button" className="button button-secondary" disabled={pending} onClick={requestClose}>Mégse</button><button type="submit" className="button button-primary" disabled={pending || historyLoading || !exercises.length}>{pending ? 'Mentés…' : item ? 'Módosítások mentése' : 'Edzés mentése'}<Check size={18} /></button></div>
     </form>
   </Modal>;
 }
