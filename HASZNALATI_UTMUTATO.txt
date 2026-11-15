@@ -1,5 +1,24 @@
 ERŐNAPLÓ – HASZNÁLATI ÚTMUTATÓ
 
+TEST ÉS ÉTREND – ÚJ NAPLÓ
+
+1. Nyisd meg a Test és étrend menüt, és válaszd ki a hetet (hétfő–vasárnap).
+2. A Napi bevitel résznél válaszd ki a napot. Másold át a YAZIO összesítését:
+   kalória kcal-ban, fehérje, szénhidrát és zsír grammokban.
+3. Nyomd meg a Napi bevitel mentése gombot. Ugyanaz a nap később javítható.
+4. Vasárnap a Vasárnapi mérés mezőibe írd a testsúlyt kg-ban, a derékbőséget
+   és a nyakkörfogatot cm-ben, majd Heti mérés mentése. Körfogatot mérj,
+   ne átmérőt. Korábbi hetek vasárnapi adatait később is kitöltheted.
+5. A Heti PDF letöltése a kiválasztott hét mentett adatait exportálja.
+   Előbb mentsd a módosításaidat! Hiányzó napot nem számol nullának.
+6. Androidon keresd a PDF-et a Letöltésekben. iPhone-on a megnyitott vagy
+   letöltött PDF megosztásánál válaszd a Mentés a Fájlokba lehetőséget.
+
+A napló személyes, másik felhasználó nem látja. A PDF-et csak azzal oszd
+meg, akinek meg szeretnéd mutatni. A bevitel nem számol étrendet vagy
+kalóriacélt; a YAZIO-ban már mért adatokat rögzíti. A mentéshez internet
+kell. Másik eszközről történt módosításnál: Adatok frissítése.
+
 BEMELEGÍTŐ ÉS MUNKASOROZATOK
 
 Összesen 4 sor az alapérték: az első mindig bemelegítő, a többi munka.

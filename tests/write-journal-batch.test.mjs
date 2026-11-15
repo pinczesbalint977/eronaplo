@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { journalChanges } from '../src/lib/journalChanges.js';
+import { validateNutrition, validateBody } from '../src/lib/health.js';
 
 // Inject the SDK boundary so commit payloads are checked without an emulator.
 const source = readFileSync(new URL('../src/lib/writeJournal.js', import.meta.url), 'utf8')
@@ -11,11 +12,11 @@ const source = readFileSync(new URL('../src/lib/writeJournal.js', import.meta.ur
 function harness({ ok = true } = {}) {
   const calls = [];
   let tokens = 0;
-  const api = new Function('deps', `const { auth, db, collection, doc, journalChanges, navigator, env, fetch } = deps;
+  const api = new Function('deps', `const { auth, db, collection, doc, journalChanges, validateNutrition, validateBody, navigator, env, fetch } = deps;
     ${source}\nreturn { writeJournal, writeJournalBatch };`)({
     auth: { currentUser: { uid: 'u', getIdToken: async () => { tokens += 1; return 'token'; } } },
     db: { app: { options: { projectId: 'demo' } } },
-    collection: () => ({}), doc: () => ({ id: 'generated' }), journalChanges,
+    collection: () => ({}), doc: () => ({ id: 'generated' }), journalChanges, validateNutrition, validateBody,
     navigator: { onLine: true }, env: { DEV: true, VITE_USE_EMULATORS: 'true' },
     fetch: async (url, request) => {
       const body = JSON.parse(request.body);
@@ -198,4 +199,54 @@ test('target snapshot bounds are independent of actual rows and legacy parent/ro
   assert.equal(Object.hasOwn(writes[6].update.fields, 'plannedWorkSets'), false);
   assert.equal(Object.hasOwn(writes[7].update.fields, 'type'), false);
   assert.equal(writes[9].update.fields.sets.integerValue, '3');
+});
+
+const daily = { date: '2026-11-15', calories: 2200, protein: 150.5, carbs: 250, fat: 70 };
+const weekly = { date: '2026-11-15', weight: 80.5, waist: 90, neck: 40 };
+test('health records use deterministic dates, one write each, and server timestamps', async () => {
+  const api = harness();
+  await api.writeJournalBatch({ ...api, operations: [
+    { kind: 'nutritionDays', createId: daily.date, values: daily },
+    { kind: 'bodyWeeks', createId: weekly.date, values: weekly },
+  ] });
+  assert.equal(api.calls.length, 1);
+  const writes = api.calls[0].writes;
+  assert.equal(writes.length, 2);
+  assert.ok(writes[0].update.name.endsWith('/nutritionDays/2026-11-15'));
+  assert.ok(writes[1].update.name.endsWith('/bodyWeeks/2026-11-15'));
+  for (const write of writes) {
+    assert.equal(write.currentDocument.exists, false);
+    assert.deepEqual(write.updateTransforms.map((item) => item.fieldPath), ['updatedAt', 'createdAt']);
+  }
+  await api.writeJournal({ ...api, kind: 'nutritionDays', id: daily.date, values: { ...daily, calories: 2300 }, previous: daily });
+  assert.equal(api.calls[1].writes.length, 1);
+  assert.equal(api.calls[1].writes[0].currentDocument.exists, true);
+  assert.deepEqual(api.calls[1].writes[0].updateTransforms.map((item) => item.fieldPath), ['updatedAt']);
+});
+
+test('unchanged health saves have no token refresh or Firebase writes', async () => {
+  const api = harness();
+  await api.writeJournalBatch({ ...api, operations: [
+    { kind: 'nutritionDays', id: daily.date, values: daily, previous: daily },
+    { kind: 'bodyWeeks', id: weekly.date, values: weekly, previous: weekly },
+  ] });
+  assert.equal(api.calls.length, 0);
+  assert.equal(api.tokens(), 0);
+});
+
+test('invalid health dates, identifiers, fields and values fail before token refresh or writing', async () => {
+  for (const operation of [
+    { kind: 'nutritionDays', createId: '2026-11-14', values: daily },
+    { kind: 'nutritionDays', values: daily },
+    { kind: 'nutritionDays', createId: daily.date, values: { ...daily, password: 'forbidden' } },
+    { kind: 'nutritionDays', createId: daily.date, values: { ...daily, fat: -1 } },
+    { kind: 'nutritionDays', createId: '2026-02-30', values: { ...daily, date: '2026-02-30' } },
+    { kind: 'bodyWeeks', createId: '2026-11-14', values: { ...weekly, date: '2026-11-14' } },
+    { kind: 'bodyWeeks', createId: weekly.date, values: { ...weekly, weight: 501 } },
+  ]) {
+    const api = harness();
+    await assert.rejects(api.writeJournalBatch({ ...api, operations: [operation] }), { code: 'invalid-argument' });
+    assert.equal(api.calls.length, 0);
+    assert.equal(api.tokens(), 0);
+  }
 });

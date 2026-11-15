@@ -8,6 +8,22 @@ Az új bemelegítő/munkasorozat-kezelés, a kizárólag tájékoztató súlyaj�
 
 A repository kizárólag forráskódot és telepítési fájlokat tartalmaz. A valódi email-címek, jelszavak, engedélyezett UID-k és edzésadatok a Firebase-ben maradnak. Az alábbi példaértékeket cseréld ki a saját beállításaidra; személyes adatot ne írj a README-be vagy a forráskódba.
 
+## Testsúly és étkezés – napi és heti napló
+
+A **Test és étrend** menüben a YAZIO napi összesítése másolható át: kalória **kcal**, fehérje/szénhidrát/zsír **gramm**. A vasárnaphoz testsúly **kg**, derékbőség és nyakkörfogat **cm** menthető; ezek körfogatok, nem átmérők. A korábbi hetek is kitölthetők és módosíthatók. Nincs ételadatbázis, célérték-előírás vagy YAZIO-integráció.
+
+A **Heti PDF letöltése** egy A4-es, kereshető magyar szövegű PDF-et készít helyben, a mentett napi értékekkel, összesítéssel, átlaggal és heti testméretekkel. A hiányzó napok nem nullák, az átlag csak a rögzített napokra vonatkozik. Az aktuális, nem mentett mezők nem kerülnek a PDF-be. iPhone-on a letöltött PDF megosztásával választható a **Mentés a Fájlokba**. A jelentés személyes adat: kizárólag az exportáló felhasználó eszközén készül, GitHubra nem kerül.
+
+Tárolás: `users/{uid}/nutritionDays/{YYYY-MM-DD}` és `users/{uid}/bodyWeeks/{vasárnap}`. Csak a saját UID és a meglévő engedélylista férhet hozzá; a mezők, tartományok, valódi dátumok, vasárnap és időbélyegek szerveroldalon is ellenőrzöttek. A meglévő edzések és tervek változatlanul megmaradnak, nincs adatmigráció.
+
+Takarékosság: csak megnyitáskor kérjük le a kiválasztott hét legfeljebb 7 napi és 1 heti dokumentumát; legfeljebb 12 hét ideiglenes memóriacache-ben marad, kijelentkezéskor törlődik. Nincs új háttérfigyelő vagy tartós helyi személyesadat-tárolás. Napi mentés **1 írás**, vasárnapi mentés **1 írás**, változatlan mentés **0 írás**, PDF-export **0 Firebase-művelet**. Teljes naplózás három embernél hetente **24 új dokumentum/írás**, évente körülbelül **1248**. A jogosultsági ellenőrzések külön olvasásai továbbra is érvényesek.
+
+**Élesítés: az új szabályokat előbb publikálni kell.** A tesztelt `firestore.rules` teljes tartalma a fejlesztési ágon: https://github.com/pinczesbalint977/eronaplo/blob/feature/health-journal/firestore.rules . Firebase Console → `eronaplo` → Firestore Database → **Rules** → a teljes régi tartalom cseréje → **Publish**. Az `access/allowedUsers` dokumentumot és a három UID-t ne módosítsd. Az új szabályok a régi adatokat is elfogadják. Csak sikeres szabálypublikálás után kerülhet az új frontend `main`-re és GitHub Pages-re. A GitHub Actions nem telepít Firebase-szabályokat.
+
+Helyi ellenőrzés (2026. november 15.): **85 unit, 42 Firestore-emulátoros jogosultsági és 30 Chromium/WebKit böngészőteszt sikeres**, valamint a build és a PWA-ellenőrzés is. A napi/heti mentés, változatlan mentés nulla írása, cache miatti nulla újraolvasás, PDF-letöltés, fiókváltás és több képernyőméret is ellenőrzött. A PDF-et független, szigorú PDF-parser is elfogadta, magyar szövege kinyerhető. A böngészőtesztek elkülönített, szintetikus helyi adatokkal futottak.
+
+A PDF a SIL OFL 1.1 alatt terjeszthető, helyben mellékelt Noto Sans betűtípust használja; a licenc a `public/fonts/OFL.txt` fájlban található. A betűtípus a PWA nyilvános offline csomagjának része, külső fontszolgáltatásra nincs szükség.
+
 ## Edzéstervek és teljes edzések
 
 Először készíts tervet az **Edzéstervek** oldalon (például Mell nap), és add hozzá a gyakorlatokat, sorozatokat és ismétléseket. Az **Edzés rögzítése** gombnál válaszd ki a tervet: a gyakorlatok automatikusan megjelennek, mellettük az előző befejezett edzés dátumával és sorozatonkénti eredményeivel. A mai mezők előtöltődnek, és szabadon módosíthatók. Nincs teljesítési jelölőnégyzet; mentéskor a megmaradt sorozatok elvégzettnek számítanak. A nem végzett sorozatokat töröld. Az érintetlen előtöltés önmagában nem kap fejlődésjelzést.

@@ -35,7 +35,7 @@ export default defineConfig(({ mode }) => {
           ],
         },
         workbox: {
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,webmanifest}'],
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,ttf,webmanifest}'],
           navigateFallback: `${base}index.html`,
           cleanupOutdatedCaches: true,
           // Only the build's public assets are precached. Auth and Firestore requests

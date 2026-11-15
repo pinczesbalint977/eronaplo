@@ -1,10 +1,13 @@
 import { collection, doc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { journalChanges } from './journalChanges';
+import { validateNutrition, validateBody } from './health';
 
 const FIELDS = {
   workouts: ['exercise', 'weight', 'reps', 'sets', 'date', 'notes'],
   plans: ['name', 'exercises'],
+  nutritionDays: ['date', 'calories', 'protein', 'carbs', 'fat'],
+  bodyWeeks: ['date', 'weight', 'waist', 'neck'],
 };
 const SET_WORKOUT_FIELDS = ['exercise', 'date', 'notes', 'setResults', 'status'];
 const TARGET_FIELDS = ['plannedWorkSets', 'targetReps'];
@@ -78,6 +81,17 @@ function prepareOperation({ uid, kind, values, id, createId, previous, remove = 
   }
 
   const documentId = id || createId || doc(collection(db, 'users', uid, kind)).id;
+  const health = kind === 'nutritionDays' || kind === 'bodyWeeks';
+  if (health) {
+    if ((!id && !createId) || (remove && !/^\d{4}-\d{2}-\d{2}$/.test(documentId))) {
+      throw failure('invalid-argument', 'A naplóbejegyzés azonosítója a dátuma legyen.');
+    }
+    if (!remove) {
+      try { values = kind === 'nutritionDays' ? validateNutrition(values) : validateBody(values); }
+      catch (error) { throw failure('invalid-argument', error.message); }
+      if (documentId !== values.date) throw failure('invalid-argument', 'A naplóbejegyzés dátuma és azonosítója eltér.');
+    }
+  }
   const documentName = `${databasePath}/documents/users/${uid}/${kind}/${documentId}`;
   let write;
   if (remove) {

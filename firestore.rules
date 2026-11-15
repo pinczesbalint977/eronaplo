@@ -62,6 +62,26 @@ service cloud.firestore {
         && data.createdAt is timestamp && data.updatedAt is timestamp;
     }
 
+    function healthDate(value) {
+      let parts = value.split('-');
+      return timestamp.date(int(parts[0]), int(parts[1]), int(parts[2]));
+    }
+
+    function validHealthDate(value) {
+      return value is string
+        && value.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$')
+        && int(value.split('-')[0]) >= 2000
+        && healthDate(value).year() == int(value.split('-')[0])
+        && healthDate(value).month() == int(value.split('-')[1])
+        && healthDate(value).day() == int(value.split('-')[2]);
+    }
+
+    function healthTimestamps(data) {
+      return data.createdAt is timestamp && data.updatedAt is timestamp
+        && data.updatedAt == request.time
+        && (resource == null ? data.createdAt == request.time : data.createdAt == resource.data.createdAt);
+    }
+
     match /users/{userId}/access/check {
       // A get of this sentinel checks permission even when it does not exist.
       allow get: if owns(userId);
@@ -110,6 +130,32 @@ service cloud.firestore {
       allow update: if owns(userId) && validPlan(request.resource.data)
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.updatedAt == request.time;
+    }
+
+    match /users/{userId}/nutritionDays/{dateId} {
+      allow read, delete: if owns(userId);
+      allow create, update: if owns(userId)
+        && request.resource.data.keys().hasAll(['date', 'calories', 'protein', 'carbs', 'fat', 'createdAt', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['date', 'calories', 'protein', 'carbs', 'fat', 'createdAt', 'updatedAt'])
+        && validHealthDate(request.resource.data.date) && dateId == request.resource.data.date
+        && request.resource.data.calories is number && request.resource.data.calories >= 0 && request.resource.data.calories <= 20000
+        && request.resource.data.protein is number && request.resource.data.protein >= 0 && request.resource.data.protein <= 2000
+        && request.resource.data.carbs is number && request.resource.data.carbs >= 0 && request.resource.data.carbs <= 2000
+        && request.resource.data.fat is number && request.resource.data.fat >= 0 && request.resource.data.fat <= 2000
+        && healthTimestamps(request.resource.data);
+    }
+
+    match /users/{userId}/bodyWeeks/{dateId} {
+      allow read, delete: if owns(userId);
+      allow create, update: if owns(userId)
+        && request.resource.data.keys().hasAll(['date', 'weight', 'waist', 'neck', 'createdAt', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['date', 'weight', 'waist', 'neck', 'createdAt', 'updatedAt'])
+        && validHealthDate(request.resource.data.date) && dateId == request.resource.data.date
+        && healthDate(request.resource.data.date).dayOfWeek() == 7
+        && request.resource.data.weight is number && request.resource.data.weight >= 20 && request.resource.data.weight <= 500
+        && request.resource.data.waist is number && request.resource.data.waist >= 20 && request.resource.data.waist <= 300
+        && request.resource.data.neck is number && request.resource.data.neck >= 10 && request.resource.data.neck <= 100
+        && healthTimestamps(request.resource.data);
     }
 
     // Includes /access/allowedUsers, all user root documents, unknown

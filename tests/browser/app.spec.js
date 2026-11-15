@@ -150,6 +150,66 @@ test.describe.serial('Valódi Auth és Firestore emulátorral', () => {
     await expect(page.getByRole('navigation')).toHaveCount(0);
   });
 
+  test('napi makrók és vasárnapi testméretek egy írással, heti PDF és fiókelkülönítés', async ({ page, context }) => {
+    const commits = [];
+    const reads = [];
+    page.on('request', (request) => {
+      if (request.url().endsWith('/documents:commit')) commits.push(request.postDataJSON());
+      if (/firestore|google\.firestore/.test(request.url()) && /nutritionDays|bodyWeeks/.test(request.postData() || request.url())) reads.push(request.url());
+    });
+    await page.goto(`${appUrl}#/taplalkozas`);
+    await login(page, 0);
+    await page.getByLabel('Hét vasárnapja', { exact: true }).fill('2026-11-08');
+    await expect(page.getByRole('region', { name: 'Napi bevitel', exact: true })).toBeVisible();
+    await page.getByLabel('Napi bevitel dátuma').selectOption('2026-11-02');
+    for (const [label, value] of [['Kalória (kcal)', '2300.5'], ['Fehérje (g)', '150'], ['Szénhidrát (g)', '250'], ['Zsír (g)', '75']]) {
+      await page.getByLabel(label, { exact: true }).fill(value);
+    }
+    const beforeSave = commits.length;
+    await page.getByRole('button', { name: 'Napi bevitel mentése', exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('A napi bevitel elmentve.');
+    expect(commits).toHaveLength(beforeSave + 1);
+    expect(commits.at(-1).writes).toHaveLength(1);
+    await expect(page.getByText('1/7 nap rögzítve', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Napi bevitel mentése', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Napi bevitel mentése', exact: true })).toBeEnabled();
+    expect(commits).toHaveLength(beforeSave + 1);
+    // Saving body measurements must preserve a not-yet-saved daily edit.
+    await page.getByLabel('Kalória (kcal)', { exact: true }).fill('2400');
+    for (const [label, value] of [['Testsúly (kg)', '85.5'], ['Derékbőség (cm)', '90'], ['Nyakkörfogat (cm)', '38.5']]) {
+      await page.getByLabel(label, { exact: true }).fill(value);
+    }
+    await page.getByRole('button', { name: 'Heti mérés mentése', exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('A heti mérés elmentve.');
+    await expect(page.getByLabel('Kalória (kcal)', { exact: true })).toHaveValue('2400');
+    expect(commits).toHaveLength(beforeSave + 2);
+    expect(commits.at(-1).writes).toHaveLength(1);
+    await page.getByRole('button', { name: 'Napi bevitel mentése', exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('A napi bevitel elmentve.');
+    const download = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Heti PDF letöltése', exact: true }).click();
+    expect((await download).suggestedFilename()).toBe('eronaplo-heti-naplo-2026-11-08.pdf');
+    const readCount = reads.length;
+    const writeCount = commits.length;
+    for (const [width, height] of [[320,568], [390,844], [768,1024], [1440,900], [844,390]]) {
+      await page.setViewportSize({ width, height });
+      await noOverflow(page);
+    }
+    await page.getByRole('link', { name: 'Áttekintés', exact: true }).first().click();
+    await page.getByRole('link', { name: 'Test és étrend', exact: true }).first().click();
+    await page.getByLabel('Hét vasárnapja', { exact: true }).fill('2026-11-08');
+    await page.getByLabel('Napi bevitel dátuma').selectOption('2026-11-02');
+    await expect(page.getByLabel('Kalória (kcal)', { exact: true })).toHaveValue('2400');
+    expect(reads).toHaveLength(readCount);
+    expect(commits).toHaveLength(writeCount);
+    await page.getByRole('button', { name: 'Kijelentkezés', exact: true }).last().click();
+    await login(page, 1);
+    await page.getByLabel('Hét vasárnapja', { exact: true }).fill('2026-11-08');
+    await expect(page.getByText('0/7 nap rögzítve', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Testsúly (kg)', { exact: true })).toHaveValue('');
+    await expect(page.getByLabel('Kalória (kcal)', { exact: true })).toHaveValue('');
+  });
+
   test('strukturált terv, teljes edzés, előtöltés, naptár, változatlan előzmények és fiókelkülönítés', async ({ page, context }) => {
     test.setTimeout(150000);
     const commits = [];

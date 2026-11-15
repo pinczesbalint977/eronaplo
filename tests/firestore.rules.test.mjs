@@ -61,6 +61,11 @@ function database(uid) {
     : environment.unauthenticatedContext().firestore();
 }
 
+const nutritionDay = (overrides = {}) => ({ date: '2026-11-15', calories: 2250, protein: 150.5, carbs: 250, fat: 70,
+  createdAt: serverTimestamp(), updatedAt: serverTimestamp(), ...overrides });
+const bodyWeek = (overrides = {}) => ({ date: '2026-11-15', weight: 82.5, waist: 90, neck: 40,
+  createdAt: serverTimestamp(), updatedAt: serverTimestamp(), ...overrides });
+
 function workoutRef(uid = FIRST, id = 'entry', db = database(uid)) {
   return doc(db, 'users', uid, 'workouts', id);
 }
@@ -90,6 +95,91 @@ beforeEach(async () => {
 
 after(async () => {
   if (environment) await environment.cleanup();
+});
+
+describe('Private nutrition and body measurements', () => {
+  const definitions = [['nutritionDays', nutritionDay], ['bodyWeeks', bodyWeek]];
+  it('allows all three approved users to manage only their own dated records', async () => {
+    await adminSet('access/allowedUsers', { uids: [FIRST, SECOND, THIRD] });
+    for (const uid of [FIRST, SECOND, THIRD]) {
+      for (const [name, payload] of definitions) {
+        const ref = doc(database(uid), 'users', uid, name, '2026-11-15');
+        await assertSucceeds(setDoc(ref, payload()));
+        assert.equal((await assertSucceeds(getDoc(ref))).exists(), true);
+        assert.equal((await assertSucceeds(getDocs(collection(database(uid), 'users', uid, name)))).size, 1);
+        await assertSucceeds(updateDoc(ref, { ...(name === 'nutritionDays' ? { calories: 2300 } : { weight: 83 }), updatedAt: serverTimestamp() }));
+        await assertSucceeds(deleteDoc(ref));
+      }
+    }
+  });
+
+  it('denies anonymous, unapproved, and cross-user reads, lists, creates, changes and deletes', async () => {
+    for (const [name, payload] of definitions) {
+      await adminSet(`users/${FIRST}/${name}/2026-11-15`, payload());
+      for (const actor of [null, OUTSIDER, SECOND]) {
+        const ref = doc(database(actor), 'users', FIRST, name, '2026-11-15');
+        await assertFails(getDoc(ref));
+        await assertFails(getDocs(collection(database(actor), 'users', FIRST, name)));
+        await assertFails(setDoc(ref, payload()));
+        await assertFails(updateDoc(ref, { updatedAt: serverTimestamp() }));
+        await assertFails(deleteDoc(ref));
+      }
+      await assertFails(setDoc(doc(database(OUTSIDER), 'users', OUTSIDER, name, '2026-11-15'), payload()));
+      await assertFails(getDocs(collectionGroup(database(FIRST), name)));
+    }
+  });
+
+  it('denies access after removal from the private allowlist', async () => {
+    for (const [name, payload] of definitions) await adminSet(`users/${FIRST}/${name}/2026-11-15`, payload());
+    await adminSet('access/allowedUsers', { uids: [SECOND, THIRD] });
+    for (const [name] of definitions) await assertFails(getDoc(doc(database(FIRST), 'users', FIRST, name, '2026-11-15')));
+  });
+
+  it('requires complete nutrition values within limits and forbids additional fields', async () => {
+    const ref = doc(database(FIRST), 'users', FIRST, 'nutritionDays', '2026-11-15');
+    for (const overrides of [{ calories: -1 }, { calories: 20001 }, { calories: '2200' }, { protein: -0.1 }, { protein: 2001 }, { carbs: 2001 }, { fat: 2001 }, { fat: null }, { password: 'forbidden' }]) {
+      await assertFails(setDoc(ref, nutritionDay(overrides)));
+    }
+    const missing = nutritionDay(); delete missing.protein;
+    await assertFails(setDoc(ref, missing));
+    await assertSucceeds(setDoc(ref, nutritionDay({ calories: 0, protein: 0, carbs: 0, fat: 0 })));
+  });
+
+  it('requires realistic complete kg/cm values for weekly measurements', async () => {
+    const ref = doc(database(FIRST), 'users', FIRST, 'bodyWeeks', '2026-11-15');
+    for (const overrides of [{ weight: 19 }, { weight: 501 }, { weight: '82' }, { waist: 19 }, { waist: 301 }, { neck: 9 }, { neck: 101 }, { extra: true }]) {
+      await assertFails(setDoc(ref, bodyWeek(overrides)));
+    }
+    const missing = bodyWeek(); delete missing.neck;
+    await assertFails(setDoc(ref, missing));
+    await assertSucceeds(setDoc(ref, bodyWeek({ weight: 20, waist: 20, neck: 10 })));
+  });
+
+  it('binds dates to document IDs and validates calendar dates including leap years', async () => {
+    const db = database(FIRST);
+    for (const [name, payload] of definitions) {
+      await assertFails(setDoc(doc(db, 'users', FIRST, name, 'different'), payload()));
+      await assertFails(setDoc(doc(db, 'users', FIRST, name, '2026-02-30'), payload({ date: '2026-02-30' })));
+      await assertFails(setDoc(doc(db, 'users', FIRST, name, '1999-12-31'), payload({ date: '1999-12-31' })));
+    }
+    await assertFails(setDoc(doc(db, 'users', FIRST, 'nutritionDays', '2026-02-29'), nutritionDay({ date: '2026-02-29' })));
+    await assertSucceeds(setDoc(doc(db, 'users', FIRST, 'nutritionDays', '2024-02-29'), nutritionDay({ date: '2024-02-29' })));
+    await assertFails(setDoc(doc(db, 'users', FIRST, 'bodyWeeks', '2026-11-14'), bodyWeek({ date: '2026-11-14' })));
+  });
+
+  it('requires server timestamps and preserves creation time on updates', async () => {
+    const stale = Timestamp.fromDate(new Date('2020-01-01T00:00:00Z'));
+    for (const [name, payload] of definitions) {
+      const ref = doc(database(FIRST), 'users', FIRST, name, '2026-11-15');
+      await assertFails(setDoc(ref, payload({ updatedAt: stale })));
+      await assertFails(setDoc(ref, payload({ createdAt: stale })));
+      await assertSucceeds(setDoc(ref, payload()));
+      await assertFails(updateDoc(ref, { createdAt: stale, updatedAt: serverTimestamp() }));
+      await assertFails(updateDoc(ref, { updatedAt: stale }));
+      await assertFails(updateDoc(ref, { date: '2026-11-22', updatedAt: serverTimestamp() }));
+      await assertSucceeds(updateDoc(ref, { updatedAt: serverTimestamp() }));
+    }
+  });
 });
 
 describe('Server-side authorization', () => {
