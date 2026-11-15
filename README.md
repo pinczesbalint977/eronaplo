@@ -8,6 +8,14 @@ Az új bemelegítő/munkasorozat-kezelés, a kizárólag tájékoztató súlyaj�
 
 A repository kizárólag forráskódot és telepítési fájlokat tartalmaz. A valódi email-címek, jelszavak, engedélyezett UID-k és edzésadatok a Firebase-ben maradnak. Az alábbi példaértékeket cseréld ki a saját beállításaidra; személyes adatot ne írj a README-be vagy a forráskódba.
 
+## Áttekintés – heti összesítés
+
+Az Áttekintés hétfőtől vasárnapig összesít: heti sorozatok és edzések, napi étkezések heti összege/napi átlaga, az adott hét vasárnapi testsúlya, derék- és nyakkörfogata. A hiányzó napok/mérések nem nullák. Az összterhelés és az edzésnapok számlálója ezen az oldalon nem jelenik meg; a naptári pipák megmaradnak.
+
+Az edzésben eltelt **teljes hetek** és **teljes naptári hónapok** az első naplózott, nem piszkozat edzés dátumától számolódnak, az összes előzményt figyelembe véve. Ez nem az adott heti edzésnapokból képzett becslés. Teljesen betöltött előzménynél nincs új lekérés, nagy naplónál általában egy, dátum szerint legelső szülődokumentum lekérése szükséges; a dátum UID-nként memóriában cache-elt. Régi sorozatokat emiatt nem töltünk le. Az étkezési heti cache közös a Test és étrend menüvel. Az új Áttekintés nem ír Firebase-be, és nem igényel új Security Rules-szabályt vagy adatmigrációt.
+
+A heti Áttekintés helyi ellenőrzése: **101 unit és 34 Chromium/WebKit böngészőteszt sikeres**, továbbá a build és a PWA-ellenőrzés is. A tesztek 100 újabb bejegyzés mellett is ellenőrzik a valódi első edzés dátumát, a régi sorozatok további betöltése nélkül.
+
 ## Testsúly és étkezés – napi és heti napló
 
 A **Test és étrend** menüben a YAZIO napi összesítése másolható át: kalória **kcal**, fehérje/szénhidrát/zsír **gramm**. A vasárnaphoz testsúly **kg**, derékbőség és nyakkörfogat **cm** menthető; ezek körfogatok, nem átmérők. A korábbi hetek is kitölthetők és módosíthatók. Nincs ételadatbázis, célérték-előírás vagy YAZIO-integráció.

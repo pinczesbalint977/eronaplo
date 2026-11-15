@@ -1,5 +1,14 @@
 ERŐNAPLÓ – HASZNÁLATI ÚTMUTATÓ
 
+ÁTTEKINTÉS – HETI ÖSSZESÍTÉS
+
+A kezdőlapon az aktuális hét (hétfő–vasárnap) edzéseit és sorozatait,
+az étkezések heti összegét/napi átlagát és a vasárnapi testméreteket látod.
+Csak a mentett adatok számítanak; a hiányzó nap/mérés nem nulla.
+Az Ennyi ideje edzel és a Hónapokban kártya az első naplózott edzés óta
+eltelt teljes heteket, illetve naptári hónapokat mutatja. A régi edzések
+is számítanak. Összterhelés és edzésnap-számláló itt már nem szerepel.
+
 TEST ÉS ÉTREND – ÚJ NAPLÓ
 
 1. Nyisd meg a Test és étrend menüt, és válaszd ki a hetet (hétfő–vasárnap).

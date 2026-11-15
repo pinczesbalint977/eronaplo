@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { collection, getDocsFromServer, limit, onSnapshot, orderBy, query, startAfter, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { writeJournalBatch } from '../lib/writeJournal';
@@ -43,6 +43,7 @@ export function useJournal(uid) {
       uid, alive: true, controller: new AbortController(), entries: new Map(), rows: new Map(),
       plans: [], groups: [], cursor: null, latestReady: false, plansReady: false, hydratedOnce: false,
       hasOlder: false, loadingOlder: false, lookupCache: new Map(), pageCache: new Map(), revision: 0,
+      firstWorkout: { value: undefined, request: null, revision: 0 },
     };
     current.current = model;
     setWorkouts([]); setPlans([]); setLoading(true); setError(''); setHasOlder(false); setLoadingOlder(false);
@@ -59,6 +60,11 @@ export function useJournal(uid) {
       setLoading(!model.hydratedOnce);
     };
     model.invalidate = () => { model.revision += 1; model.lookupCache.clear(); };
+    model.invalidateFirstWorkout = () => {
+      model.firstWorkout.revision += 1;
+      model.firstWorkout.value = undefined;
+      model.firstWorkout.request = null;
+    };
     model.fail = (reason, initial = false) => {
       if (!active()) return;
       if (denied(reason)) { void logout(); return; }
@@ -129,6 +135,17 @@ export function useJournal(uid) {
       { includeMetadataChanges: true }, (snapshot) => {
         if (!active() || snapshot.metadata.fromCache) return;
         const entries = snapshot.docs.filter((item) => !item.metadata.hasPendingWrites).map(documentValue);
+        const firstDate = model.firstWorkout.value;
+        // Row updates never invalidate this cache. A newer workout cannot change
+        // a known first date; backfilling or editing that first date can.
+        if (snapshot.docChanges().some((change) => {
+          const previous = model.entries.get(change.doc.id);
+          const next = change.doc.data();
+          return firstDate === undefined || firstDate === null
+            || (change.type === 'removed' && previous?.date === firstDate)
+            || (next.status !== 'draft' && next.date < firstDate)
+            || (previous?.date === firstDate && (next.date !== previous.date || next.status === 'draft'));
+        })) model.invalidateFirstWorkout();
         const boundary = snapshot.docs.at(-1);
         snapshot.docChanges().filter((change) => change.type === 'removed').forEach((change) => {
           if (snapshot.size < PAGE_SIZE || (boundary && isOlder(boundary, change.doc))) model.entries.delete(change.doc.id);
@@ -152,9 +169,51 @@ export function useJournal(uid) {
       model.alive = false; model.controller.abort(); unsubscribeWorkouts(); unsubscribePlans();
       model.groups.forEach((group) => group.unsubscribe());
       model.entries.clear(); model.rows.clear(); model.lookupCache.clear(); model.pageCache.clear(); model.plans = []; model.groups = [];
+      model.invalidateFirstWorkout();
       if (current.current === model) current.current = null;
     };
   }, [uid, logout, isSessionActive]);
+
+  const getFirstWorkoutDate = useCallback(async function readFirstWorkoutDate() {
+    const model = current.current;
+    if (!model || model.uid !== uid) throw cancelled();
+    model.check();
+    const cache = model.firstWorkout;
+    if (cache.value !== undefined) return cache.value;
+    if (cache.request) return cache.request;
+    const eligible = (entry) => entry.status !== 'draft' && typeof entry.date === 'string'
+      && /^\d{4}-\d{2}-\d{2}$/.test(entry.date);
+    if (model.latestReady && !model.hasOlder) {
+      cache.value = [...model.entries.values()].filter(eligible)
+        .reduce((first, entry) => first === null || entry.date < first ? entry.date : first, null);
+      return cache.value;
+    }
+    const revision = cache.revision;
+    const request = (async () => {
+      let cursor = null;
+      for (;;) {
+        model.check();
+        const size = cursor ? 10 : 1;
+        const constraints = [orderBy('date', 'asc')];
+        if (cursor) constraints.push(startAfter(cursor));
+        const snapshot = await getDocsFromServer(query(collection(db, 'users', uid, 'workouts'), ...constraints, limit(size)));
+        model.check();
+        if (cache.revision !== revision) return readFirstWorkoutDate();
+        const first = snapshot.docs.map(documentValue).find(eligible);
+        if (first || snapshot.size < size) {
+          cache.value = first?.date ?? null;
+          return cache.value;
+        }
+        cursor = snapshot.docs.at(-1);
+      }
+    })();
+    cache.request = request;
+    try { return await request; }
+    catch (reason) {
+      if (denied(reason) && current.current === model) void logout();
+      throw reason;
+    } finally { if (cache.request === request) cache.request = null; }
+  }, [uid, logout]);
 
   async function loadOlder() {
     const model = current.current;
@@ -272,7 +331,7 @@ export function useJournal(uid) {
         }
       });
       if (workoutsChanged || plansChanged) model.invalidate();
-      if (workoutsChanged) model.publish();
+      if (workoutsChanged) { model.invalidateFirstWorkout(); model.publish(); }
       if (plansChanged) setPlans(model.plans);
       return batch;
     } catch (reason) {
@@ -300,5 +359,5 @@ export function useJournal(uid) {
   const ownSession = current.current?.uid === uid;
   return { workouts: ownSession ? workouts : [], plans: ownSession ? plans : [], loading: ownSession ? loading : true,
     error: ownSession ? error : '', save, remove, saveSession, removeSession,
-    hasOlder: ownSession && hasOlder, loadingOlder, loadOlder, lookupPrevious };
+    hasOlder: ownSession && hasOlder, loadingOlder, loadOlder, lookupPrevious, getFirstWorkoutDate };
 }

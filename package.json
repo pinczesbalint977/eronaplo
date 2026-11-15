@@ -11,7 +11,7 @@
     "build": "node scripts/generate-icons.mjs && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "test:rules": "firebase emulators:exec --only firestore --project demo-eronaplo \"node --test tests/firestore.rules.test.mjs\"",
-    "test:unit": "node --test tests/workouts.test.mjs tests/journal-changes.test.mjs tests/sessions.test.mjs tests/write-journal-batch.test.mjs tests/pwa-config.test.mjs tests/leave-guard.test.mjs tests/health.test.mjs tests/health-pdf.test.mjs",
+    "test:unit": "node --test tests/workouts.test.mjs tests/journal-changes.test.mjs tests/sessions.test.mjs tests/write-journal-batch.test.mjs tests/pwa-config.test.mjs tests/leave-guard.test.mjs tests/health.test.mjs tests/health-pdf.test.mjs tests/training-age.test.mjs tests/first-workout.test.mjs",
     "test:e2e": "firebase emulators:exec --only auth,firestore --project demo-eronaplo \"playwright test\"",
     "test:pwa": "node --test tests/pwa-config.test.mjs",
     "check:deploy": "node scripts/check-deploy-env.mjs"

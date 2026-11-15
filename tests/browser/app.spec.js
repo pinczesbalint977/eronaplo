@@ -553,6 +553,12 @@ test.describe.serial('Valódi Auth és Firestore emulátorral', () => {
       return (await getDocsFromCache(collection(db,'users',uid,'workoutSets'))).size;
     }, allowedIds[0]);
     expect(await cachedSets()).toBe(100);
+    await page.getByRole('link', { name: 'Áttekintés', exact: true }).first().click();
+    const currentDay = new Date(await page.evaluate(() => new Date().toLocaleDateString('sv-SE')) + 'T00:00:00Z');
+    const expectedWeeks = Math.floor((currentDay - new Date('2020-01-01T00:00:00Z')) / 604800000);
+    await expect(page.locator('.metric-card').first().locator('.metric-value')).toHaveText(new RegExp(`${expectedWeeks}\\s*hét`));
+    expect(await cachedSets()).toBe(100);
+    await page.getByRole('link', { name: 'Edzésnapló', exact: true }).first().click();
     await openSession(page, oldPlan);
     await expect(page.locator('.series-history')).toContainText('2020. január 1.');
     await expect(weight(page, oldExercise, 1)).toHaveValue('55');
